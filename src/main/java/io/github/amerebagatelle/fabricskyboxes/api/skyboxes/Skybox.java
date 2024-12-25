@@ -1,9 +1,9 @@
 package io.github.amerebagatelle.fabricskyboxes.api.skyboxes;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import io.github.amerebagatelle.fabricskyboxes.mixin.skybox.WorldRendererAccess;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.client.world.ClientWorld;
+import net.minecraft.client.Camera;
+import net.minecraft.client.multiplayer.ClientLevel;
 import org.joml.Matrix4f;
 
 public interface Skybox {
@@ -29,7 +29,7 @@ public interface Skybox {
      * @param thickFog            Is using thick fog.
      * @param fogCallback         The fogCallback to run.
      */
-    void render(WorldRendererAccess worldRendererAccess, MatrixStack matrixStack, Matrix4f projectionMatrix, float tickDelta, Camera camera, boolean thickFog, Runnable fogCallback);
+    void render(WorldRendererAccess worldRendererAccess, PoseStack matrixStack, Matrix4f projectionMatrix, float tickDelta, Camera camera, boolean thickFog);
 
     /**
      * The main thread for a skybox
@@ -38,7 +38,7 @@ public interface Skybox {
      *
      * @param clientWorld The client's world
      */
-    void tick(ClientWorld clientWorld);
+    void tick(ClientLevel clientWorld);
 
     /**
      * Gets the state of the skybox.

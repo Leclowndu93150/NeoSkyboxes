@@ -1,34 +1,38 @@
 package io.github.amerebagatelle.fabricskyboxes.mixin.skybox;
 
-import net.minecraft.client.gl.VertexBuffer;
-import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(WorldRenderer.class)
+import com.mojang.blaze3d.vertex.VertexBuffer;
+
+@Mixin(LevelRenderer.class)
 public interface WorldRendererAccess {
-    @Accessor("SUN")
-    static Identifier getSun() {
+    @Deprecated
+    @Accessor("SUN_LOCATION")
+    static ResourceLocation getSun() {
         throw new AssertionError();
     }
 
-    @Accessor("MOON_PHASES")
-    static Identifier getMoonPhases() {
+    @Deprecated
+    @Accessor("MOON_LOCATION")
+    static ResourceLocation getMoonPhases() {
         throw new AssertionError();
     }
 
-    @Accessor("END_SKY")
-    static Identifier getEndSky() {
+    @Deprecated
+    @Accessor("END_SKY_LOCATION")
+    static ResourceLocation getEndSky() {
         throw new AssertionError();
     }
 
-    @Accessor
+    @Accessor("skyBuffer")
     VertexBuffer getLightSkyBuffer();
 
-    @Accessor
+    @Accessor("starBuffer")
     VertexBuffer getStarsBuffer();
 
-    @Accessor
+    @Accessor("darkBuffer")
     VertexBuffer getDarkSkyBuffer();
 }

@@ -3,8 +3,8 @@ package io.github.amerebagatelle.fabricskyboxes.util;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.github.amerebagatelle.fabricskyboxes.FabricSkyBoxesClient;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.JsonHelper;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.GsonHelper;
 
 import java.util.Optional;
 
@@ -19,14 +19,14 @@ public class JsonObjectWrapper {
         return this.focusedObject.get(memberName);
     }
 
-    public Identifier getJsonStringAsId(String key) {
+    public ResourceLocation getJsonStringAsId(String key) {
         if (!this.contains(key)) {
             FabricSkyBoxesClient.getLogger().warn("Could not find Identifier with key \"" + key + "\"");
             FabricSkyBoxesClient.getLogger().debug(new Throwable());
             FabricSkyBoxesClient.getLogger().debug(this.getFocusedObject().toString());
             return null;
         }
-        return Identifier.tryParse(this.focusedObject.get(key).getAsString());
+        return ResourceLocation.tryParse(this.focusedObject.get(key).getAsString());
     }
 
     public Optional<JsonElement> getOptionalValue(String key) {
@@ -41,7 +41,7 @@ public class JsonObjectWrapper {
             return defaultValue;
         }
         JsonElement element = this.getOptionalValue(key).get();
-        return JsonHelper.isNumber(element) ? element.getAsFloat() : defaultValue;
+        return GsonHelper.isNumberValue(element) ? element.getAsFloat() : defaultValue;
     }
 
     public boolean getOptionalBoolean(String key, boolean defaultValue) {

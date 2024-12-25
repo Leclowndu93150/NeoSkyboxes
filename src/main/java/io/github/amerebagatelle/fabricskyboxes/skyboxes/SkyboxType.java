@@ -4,15 +4,16 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.Lifecycle;
 import io.github.amerebagatelle.fabricskyboxes.FabricSkyBoxesClient;
-import io.github.amerebagatelle.fabricskyboxes.api.skyboxes.Skybox;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.textured.*;
-import net.fabricmc.fabric.api.event.registry.FabricRegistryBuilder;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.SimpleRegistry;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.IRegistryExtension;
+import net.neoforged.neoforge.registries.RegistryBuilder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -20,40 +21,66 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-public class SkyboxType<T extends Skybox> {
-    public static final Registry<SkyboxType<? extends Skybox>> REGISTRY;
-    public static final SkyboxType<MonoColorSkybox> MONO_COLOR_SKYBOX;
-    public static final SkyboxType<OverworldSkybox> OVERWORLD_SKYBOX;
-    public static final SkyboxType<EndSkybox> END_SKYBOX;
-    public static final SkyboxType<SquareTexturedSkybox> SQUARE_TEXTURED_SKYBOX;
-    public static final SkyboxType<SingleSpriteSquareTexturedSkybox> SINGLE_SPRITE_SQUARE_TEXTURED_SKYBOX;
-    public static final SkyboxType<AnimatedSquareTexturedSkybox> ANIMATED_SQUARE_TEXTURED_SKYBOX;
-    public static final SkyboxType<SingleSpriteAnimatedSquareTexturedSkybox> SINGLE_SPRITE_ANIMATED_SQUARE_TEXTURED_SKYBOX;
-    public static final SkyboxType<MultiTextureSkybox> MULTI_TEXTURE_SKYBOX;
-    public static final Codec<Identifier> SKYBOX_ID_CODEC;
+public class SkyboxType<T extends AbstractSkybox> {
+    public static final ResourceKey<Registry<SkyboxType<?>>> SKYBOX_TYPE_KEY = ResourceKey.createRegistryKey(
+            ResourceLocation.fromNamespaceAndPath(FabricSkyBoxesClient.MODID, "skybox_type"));
 
-    static {
-        REGISTRY = FabricRegistryBuilder.<SkyboxType<? extends Skybox>, SimpleRegistry<SkyboxType<? extends Skybox>>>from(new SimpleRegistry<>(RegistryKey.ofRegistry(Identifier.of(FabricSkyBoxesClient.MODID, "skybox_type")), Lifecycle.stable())).buildAndRegister();
-        MONO_COLOR_SKYBOX = register(SkyboxType.Builder.create(MonoColorSkybox.class, "monocolor").legacySupported().deserializer(LegacyDeserializer.MONO_COLOR_SKYBOX_DESERIALIZER).factory(MonoColorSkybox::new).add(2, MonoColorSkybox.CODEC).build());
-        OVERWORLD_SKYBOX = register(SkyboxType.Builder.create(OverworldSkybox.class, "overworld").add(2, OverworldSkybox.CODEC).build());
-        END_SKYBOX = register(SkyboxType.Builder.create(EndSkybox.class, "end").add(2, EndSkybox.CODEC).build());
-        SQUARE_TEXTURED_SKYBOX = register(SkyboxType.Builder.create(SquareTexturedSkybox.class, "square-textured").deserializer(LegacyDeserializer.SQUARE_TEXTURED_SKYBOX_DESERIALIZER).legacySupported().factory(SquareTexturedSkybox::new).add(2, SquareTexturedSkybox.CODEC).build());
-        SINGLE_SPRITE_SQUARE_TEXTURED_SKYBOX = register(SkyboxType.Builder.create(SingleSpriteSquareTexturedSkybox.class, "single-sprite-square-textured").add(2, SingleSpriteSquareTexturedSkybox.CODEC).build());
-        ANIMATED_SQUARE_TEXTURED_SKYBOX = register(SkyboxType.Builder.create(AnimatedSquareTexturedSkybox.class, "animated-square-textured").add(2, AnimatedSquareTexturedSkybox.CODEC).build());
-        SINGLE_SPRITE_ANIMATED_SQUARE_TEXTURED_SKYBOX = register(SkyboxType.Builder.create(SingleSpriteAnimatedSquareTexturedSkybox.class, "single-sprite-animated-square-textured").add(2, SingleSpriteAnimatedSquareTexturedSkybox.CODEC).build());
-        MULTI_TEXTURE_SKYBOX = register(SkyboxType.Builder.create(MultiTextureSkybox.class, "multi-texture").add(2, MultiTextureSkybox.CODEC).build());
-        SKYBOX_ID_CODEC = Codec.STRING.xmap((s) -> {
-            if (!s.contains(":")) {
-                return Identifier.of(FabricSkyBoxesClient.MODID, s.replace('-', '_'));
-            }
-            return Identifier.of(s.replace('-', '_'));
-        }, (id) -> {
-            if (id.getNamespace().equals(FabricSkyBoxesClient.MODID)) {
-                return id.getPath().replace('_', '-');
-            }
-            return id.toString().replace('_', '-');
-        });
-    }
+    public static final DeferredRegister<SkyboxType<?>> SKYBOX_TYPES = DeferredRegister.create(SKYBOX_TYPE_KEY, FabricSkyBoxesClient.MODID);
+
+    public static final Supplier<IRegistryExtension<SkyboxType<?>>> REGISTRY = SKYBOX_TYPES.makeRegistry(RegistryBuilder::create);
+
+    public static final DeferredHolder<SkyboxType<?>, SkyboxType<MonoColorSkybox>> MONO_COLOR_SKYBOX = SKYBOX_TYPES.register("monocolor",
+            () -> SkyboxType.Builder.create(MonoColorSkybox.class, "monocolor")
+                    .legacySupported()
+                    .deserializer(LegacyDeserializer.MONO_COLOR_SKYBOX_DESERIALIZER.get())
+                    .factory(MonoColorSkybox::new)
+                    .add(2, MonoColorSkybox.CODEC)
+                    .build());
+
+    public static final DeferredHolder<SkyboxType<?>, SkyboxType<OverworldSkybox>> OVERWORLD_SKYBOX = SKYBOX_TYPES.register("overworld",
+            () -> SkyboxType.Builder.create(OverworldSkybox.class, "overworld")
+                    .add(2, OverworldSkybox.CODEC)
+                    .build());
+
+    public static final DeferredHolder<SkyboxType<?>, SkyboxType<EndSkybox>> END_SKYBOX = SKYBOX_TYPES.register("end",
+            () -> SkyboxType.Builder.create(EndSkybox.class, "end")
+                    .add(2, EndSkybox.CODEC)
+                    .build());
+
+    public static final DeferredHolder<SkyboxType<?>, SkyboxType<SquareTexturedSkybox>> SQUARE_TEXTURED_SKYBOX = SKYBOX_TYPES.register("square_textured",
+            () -> SkyboxType.Builder.create(SquareTexturedSkybox.class, "square-textured")
+                    .deserializer(LegacyDeserializer.SQUARE_TEXTURED_SKYBOX_DESERIALIZER.get())
+                    .legacySupported()
+                    .factory(SquareTexturedSkybox::new)
+                    .add(2, SquareTexturedSkybox.CODEC)
+                    .build());
+
+    public static final DeferredHolder<SkyboxType<?>, SkyboxType<SingleSpriteSquareTexturedSkybox>> SINGLE_SPRITE_SQUARE_TEXTURED_SKYBOX = SKYBOX_TYPES.register("single_sprite_square_textured",
+            () -> SkyboxType.Builder.create(SingleSpriteSquareTexturedSkybox.class, "single-sprite-square-textured")
+                    .add(2, SingleSpriteSquareTexturedSkybox.CODEC)
+                    .build());
+
+    public static final DeferredHolder<SkyboxType<?>, SkyboxType<AnimatedSquareTexturedSkybox>> ANIMATED_SQUARE_TEXTURED_SKYBOX = SKYBOX_TYPES.register("animated_square_textured",
+            () -> SkyboxType.Builder.create(AnimatedSquareTexturedSkybox.class, "animated-square-textured")
+                    .add(2, AnimatedSquareTexturedSkybox.CODEC)
+                    .build());
+
+    public static final DeferredHolder<SkyboxType<?>, SkyboxType<SingleSpriteAnimatedSquareTexturedSkybox>> SINGLE_SPRITE_ANIMATED_SQUARE_TEXTURED_SKYBOX = SKYBOX_TYPES.register("single_sprite_animated_square_textured",
+            () -> SkyboxType.Builder.create(SingleSpriteAnimatedSquareTexturedSkybox.class, "single-sprite-animated-square-textured")
+                    .add(2, SingleSpriteAnimatedSquareTexturedSkybox.CODEC)
+                    .build());
+
+    public static final DeferredHolder<SkyboxType<?>, SkyboxType<MultiTextureSkybox>> MULTI_TEXTURE_SKYBOX = SKYBOX_TYPES.register("multi_texture",
+            () -> SkyboxType.Builder.create(MultiTextureSkybox.class, "multi-texture")
+                    .add(2, MultiTextureSkybox.CODEC)
+                    .build());
+
+    public static final Codec<ResourceLocation> SKYBOX_ID_CODEC = Codec.STRING.xmap(
+            s -> !s.contains(":") ? ResourceLocation.fromNamespaceAndPath(FabricSkyBoxesClient.MODID, s.replace('-', '_'))
+                    : ResourceLocation.withDefaultNamespace(s.replace('-', '_')),
+            id -> id.getNamespace().equals(FabricSkyBoxesClient.MODID) ? id.getPath().replace('_', '-')
+                    : id.toString().replace('_', '-')
+    );
 
     private final BiMap<Integer, Codec<T>> codecBiMap;
     private final boolean legacySupported;
@@ -63,7 +90,8 @@ public class SkyboxType<T extends Skybox> {
     @Nullable
     private final LegacyDeserializer<T> deserializer;
 
-    private SkyboxType(BiMap<Integer, Codec<T>> codecBiMap, boolean legacySupported, String name, @Nullable Supplier<T> factory, @Nullable LegacyDeserializer<T> deserializer) {
+    private SkyboxType(BiMap<Integer, Codec<T>> codecBiMap, boolean legacySupported, String name,
+                       @Nullable Supplier<T> factory, @Nullable LegacyDeserializer<T> deserializer) {
         this.codecBiMap = codecBiMap;
         this.legacySupported = legacySupported;
         this.name = name;
@@ -71,14 +99,8 @@ public class SkyboxType<T extends Skybox> {
         this.deserializer = deserializer;
     }
 
-    public static void initRegistry() {
-        if (REGISTRY == null) {
-            System.err.println("[FabricSkyboxes] Registry not loaded?");
-        }
-    }
-
-    private static <T extends Skybox> SkyboxType<T> register(SkyboxType<T> type) {
-        return Registry.register(SkyboxType.REGISTRY, type.createId(FabricSkyBoxesClient.MODID), type);
+    public static void register(IEventBus modEventBus) {
+        SKYBOX_TYPES.register(modEventBus);
     }
 
     public String getName() {
@@ -99,19 +121,21 @@ public class SkyboxType<T extends Skybox> {
         return this.deserializer;
     }
 
-    public Identifier createId(String namespace) {
+    public ResourceLocation createId(String namespace) {
         return this.createIdFactory().apply(namespace);
     }
 
-    public Function<String, Identifier> createIdFactory() {
-        return (ns) -> Identifier.of(ns, this.getName().replace('-', '_'));
+    public Function<String, ResourceLocation> createIdFactory() {
+        return ns -> ResourceLocation.fromNamespaceAndPath(ns, this.getName().replace('-', '_'));
     }
 
     public Codec<T> getCodec(int schemaVersion) {
-        return Objects.requireNonNull(this.codecBiMap.get(schemaVersion), String.format("Unsupported schema version '%d' for skybox type %s", schemaVersion, this.name));
+        return Objects.requireNonNull(this.codecBiMap.get(schemaVersion),
+                String.format("Unsupported schema version '%d' for skybox type %s", schemaVersion, this.name));
     }
 
-    public static class Builder<T extends Skybox> {
+
+    public static class Builder<T extends AbstractSkybox> {
         private final ImmutableBiMap.Builder<Integer, Codec<T>> builder = ImmutableBiMap.builder();
         private String name;
         private boolean legacySupported = false;
@@ -121,13 +145,13 @@ public class SkyboxType<T extends Skybox> {
         private Builder() {
         }
 
-        public static <S extends Skybox> Builder<S> create(@SuppressWarnings("unused") Class<S> clazz, String name) {
+        public static <S extends AbstractSkybox> Builder<S> create(@SuppressWarnings("unused") Class<S> clazz, String name) {
             Builder<S> builder = new Builder<>();
             builder.name = name;
             return builder;
         }
 
-        public static <S extends Skybox> Builder<S> create(String name) {
+        public static <S extends AbstractSkybox> Builder<S> create(String name) {
             Builder<S> builder = new Builder<>();
             builder.name = name;
             return builder;
@@ -163,8 +187,8 @@ public class SkyboxType<T extends Skybox> {
             return new SkyboxType<>(this.builder.build(), this.legacySupported, this.name, this.factory, this.deserializer);
         }
 
-        public SkyboxType<T> buildAndRegister(String namespace) {
-            return Registry.register(SkyboxType.REGISTRY, Identifier.of(namespace, this.name.replace('-', '_')), this.build());
-        }
+        /*public SkyboxType<T> buildAndRegister(String namespace) {
+            return Registry.register(SkyboxType.REGISTRY, new ResourceLocation(namespace, this.name.replace('-', '_')), this.build());
+        }*/
     }
 }

@@ -7,10 +7,20 @@ import com.mojang.serialization.JsonOps;
 import io.github.amerebagatelle.fabricskyboxes.api.FabricSkyBoxesApi;
 import io.github.amerebagatelle.fabricskyboxes.api.skyboxes.Skybox;
 import io.github.amerebagatelle.fabricskyboxes.mixin.skybox.WorldRendererAccess;
+import io.github.amerebagatelle.fabricskyboxes.skyboxes.AbstractSkybox;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.SkyboxType;
 import io.github.amerebagatelle.fabricskyboxes.util.JsonObjectWrapper;
 import io.github.amerebagatelle.fabricskyboxes.util.object.internal.Metadata;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
+
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.resources.ResourceLocation;
+
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import org.jetbrains.annotations.ApiStatus.Internal;
 import org.joml.Matrix4f;
 
@@ -22,37 +32,37 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-public class SkyboxManager implements FabricSkyBoxesApi, ClientTickEvents.EndWorldTick {
+public class SkyboxManager implements FabricSkyBoxesApi {
     private static final SkyboxManager INSTANCE = new SkyboxManager();
-    private final Map<Identifier, Skybox> skyboxMap = new Object2ObjectLinkedOpenHashMap<>();
+    private final Map<ResourceLocation, Skybox> skyboxMap = new Object2ObjectLinkedOpenHashMap<>();
     /**
      * Stores a list of permanent skyboxes
      *
-     * @see #addPermanentSkybox(Identifier, Skybox)
+     * @see #addPermanentSkybox(ResourceLocation, Skybox)
      */
-    private final Map<Identifier, Skybox> permanentSkyboxMap = new Object2ObjectLinkedOpenHashMap<>();
+    private final Map<ResourceLocation, Skybox> permanentSkyboxMap = new Object2ObjectLinkedOpenHashMap<>();
     private final List<Skybox> activeSkyboxes = new LinkedList<>();
     private final Predicate<? super Skybox> renderPredicate = (skybox) -> !this.activeSkyboxes.contains(skybox) && skybox.isActive();
     private Skybox currentSkybox = null;
     private boolean enabled = true;
 
-    public static Skybox parseSkyboxJson(Identifier id, JsonObjectWrapper objectWrapper) {
-        Skybox skybox;
+    public static AbstractSkybox parseSkyboxJson(ResourceLocation id, JsonObjectWrapper objectWrapper) {
+        AbstractSkybox skybox;
         Metadata metadata;
 
         try {
             metadata = Metadata.CODEC.decode(JsonOps.INSTANCE, objectWrapper.getFocusedObject()).getOrThrow().getFirst();
         } catch (RuntimeException e) {
-            FabricSkyBoxesClient.getLogger().warn("Skipping invalid skybox {}", id.toString(), e);
+            FabricSkyBoxesClient.getLogger().warn("Skipping invalid skybox " + id.toString(), e);
             FabricSkyBoxesClient.getLogger().warn(objectWrapper.toString());
             return null;
         }
 
-        SkyboxType<? extends Skybox> type = SkyboxType.REGISTRY.get(metadata.getType());
+        SkyboxType<? extends AbstractSkybox> type = SkyboxType.SKYBOX_TYPES.get(metadata.getType());
         Preconditions.checkNotNull(type, "Unknown skybox type: " + metadata.getType().getPath().replace('_', '-'));
         if (metadata.getSchemaVersion() == 1) {
             Preconditions.checkArgument(type.isLegacySupported(), "Unsupported schema version '1' for skybox type " + type.getName());
-            FabricSkyBoxesClient.getLogger().debug("Using legacy deserializer for skybox {}", id.toString());
+            FabricSkyBoxesClient.getLogger().debug("Using legacy deserializer for skybox " + id.toString());
             skybox = type.instantiate();
             //noinspection ConstantConditions
             type.getDeserializer().getDeserializer().accept(objectWrapper, skybox);
@@ -66,17 +76,17 @@ public class SkyboxManager implements FabricSkyBoxesApi, ClientTickEvents.EndWor
         return INSTANCE;
     }
 
-    public void addSkybox(Identifier identifier, JsonObject jsonObject) {
-        Skybox skybox = SkyboxManager.parseSkyboxJson(identifier, new JsonObjectWrapper(jsonObject));
+    public void addSkybox(ResourceLocation ResourceLocation, JsonObject jsonObject) {
+        Skybox skybox = SkyboxManager.parseSkyboxJson(ResourceLocation, new JsonObjectWrapper(jsonObject));
         if (skybox != null) {
-            this.addSkybox(identifier, skybox);
+            this.addSkybox(ResourceLocation, skybox);
         }
     }
 
-    public void addSkybox(Identifier identifier, Skybox skybox) {
-        Preconditions.checkNotNull(identifier, "Identifier was null");
+    public void addSkybox(ResourceLocation ResourceLocation, Skybox skybox) {
+        Preconditions.checkNotNull(ResourceLocation, "ResourceLocation was null");
         Preconditions.checkNotNull(skybox, "Skybox was null");
-        this.skyboxMap.put(identifier, skybox);
+        this.skyboxMap.put(ResourceLocation, skybox);
         this.sortSkybox();
     }
 
@@ -92,7 +102,7 @@ public class SkyboxManager implements FabricSkyBoxesApi, ClientTickEvents.EndWor
      * "fabricskyboxes:sky/overworld_sky2.json"
      */
     private void sortSkybox() {
-        Map<Identifier, Skybox> newSortedMap = this.skyboxMap.entrySet()
+        Map<ResourceLocation, Skybox> newSortedMap = this.skyboxMap.entrySet()
                 .stream()
                 .sorted(Map.Entry.comparingByValue(Comparator.comparingInt(Skybox::getPriority)))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (skybox, skybox2) -> skybox, Object2ObjectLinkedOpenHashMap::new));
@@ -107,10 +117,10 @@ public class SkyboxManager implements FabricSkyBoxesApi, ClientTickEvents.EndWor
      *
      * @param skybox the skybox to be added to the list of permanent skyboxes
      */
-    public void addPermanentSkybox(Identifier identifier, Skybox skybox) {
-        Preconditions.checkNotNull(identifier, "Identifier was null");
+    public void addPermanentSkybox(ResourceLocation ResourceLocation, Skybox skybox) {
+        Preconditions.checkNotNull(ResourceLocation, "ResourceLocation was null");
         Preconditions.checkNotNull(skybox, "Skybox was null");
-        this.permanentSkyboxMap.put(identifier, skybox);
+        this.permanentSkyboxMap.put(ResourceLocation, skybox);
     }
 
     @Internal
@@ -120,10 +130,10 @@ public class SkyboxManager implements FabricSkyBoxesApi, ClientTickEvents.EndWor
     }
 
     @Internal
-    public void renderSkyboxes(WorldRendererAccess worldRendererAccess, MatrixStack matrixStack, Matrix4f projectionMatrix, float tickDelta, Camera camera, boolean thickFog, Runnable fogCallback) {
+    public void renderSkyboxes(WorldRendererAccess worldRendererAccess, PoseStack matrices, Matrix4f matrix4f, float tickDelta, Camera camera, boolean thickFog) {
         this.activeSkyboxes.forEach(skybox -> {
             this.currentSkybox = skybox;
-            skybox.render(worldRendererAccess, matrixStack, projectionMatrix, tickDelta, camera, thickFog, fogCallback);
+            skybox.render(worldRendererAccess, matrices, matrix4f, tickDelta, camera, thickFog);
         });
     }
 
@@ -149,8 +159,10 @@ public class SkyboxManager implements FabricSkyBoxesApi, ClientTickEvents.EndWor
         return this.activeSkyboxes;
     }
 
-    @Override
-    public void onEndTick(ClientWorld client) {
+    @SubscribeEvent
+    public void onEndTick(LevelTickEvent.Post event) {
+        if (!event.getLevel().isClientSide()) return;
+        ClientLevel client = Minecraft.getInstance().level;
         StreamSupport
                 .stream(Iterables.concat(this.skyboxMap.values(), this.permanentSkyboxMap.values()).spliterator(), false)
                 .forEach(skybox -> skybox.tick(client));
@@ -161,7 +173,7 @@ public class SkyboxManager implements FabricSkyBoxesApi, ClientTickEvents.EndWor
         this.activeSkyboxes.sort(Comparator.comparingInt(Skybox::getPriority));
     }
 
-    public Map<Identifier, Skybox> getSkyboxMap() {
-        return this.skyboxMap;
+    public Map<ResourceLocation, Skybox> getSkyboxMap() {
+        return skyboxMap;
     }
 }

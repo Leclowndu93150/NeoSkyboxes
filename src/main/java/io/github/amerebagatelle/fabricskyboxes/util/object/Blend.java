@@ -27,42 +27,42 @@ public class Blend {
         if (!type.isEmpty()) {
             switch (type) {
                 case "add" -> this.blendFunc = (alpha) -> {
-                    RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE);
+                    RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
                     RenderSystem.blendEquation(Blender.Equation.ADD.value);
                     RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, alpha);
                 };
                 case "subtract" -> this.blendFunc = (alpha) -> {
-                    RenderSystem.blendFunc(GlStateManager.SrcFactor.ONE_MINUS_DST_COLOR, GlStateManager.DstFactor.ZERO);
+                    RenderSystem.blendFunc(GlStateManager.SourceFactor.ONE_MINUS_DST_COLOR, GlStateManager.DestFactor.ZERO);
                     RenderSystem.blendEquation(Blender.Equation.ADD.value);
                     RenderSystem.setShaderColor(alpha, alpha, alpha, 1.0F);
                 };
                 case "multiply" -> this.blendFunc = (alpha) -> {
-                    RenderSystem.blendFunc(GlStateManager.SrcFactor.DST_COLOR, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
+                    RenderSystem.blendFunc(GlStateManager.SourceFactor.DST_COLOR, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
                     RenderSystem.blendEquation(Blender.Equation.ADD.value);
                     RenderSystem.setShaderColor(alpha, alpha, alpha, alpha);
                 };
                 case "screen" -> this.blendFunc = (alpha) -> {
-                    RenderSystem.blendFunc(GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE_MINUS_SRC_COLOR);
+                    RenderSystem.blendFunc(GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ONE_MINUS_SRC_COLOR);
                     RenderSystem.blendEquation(Blender.Equation.ADD.value);
                     RenderSystem.setShaderColor(alpha, alpha, alpha, 1.0F);
                 };
                 case "replace" -> this.blendFunc = (alpha) -> {
-                    RenderSystem.blendFunc(GlStateManager.SrcFactor.ZERO, GlStateManager.DstFactor.ONE);
+                    RenderSystem.blendFunc(GlStateManager.SourceFactor.ZERO, GlStateManager.DestFactor.ONE);
                     RenderSystem.blendEquation(Blender.Equation.ADD.value);
                     RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, alpha);
                 };
                 case "alpha" -> this.blendFunc = (alpha) -> {
-                    RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
+                    RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
                     RenderSystem.blendEquation(Blender.Equation.ADD.value);
                     RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, alpha);
                 };
                 case "burn" -> this.blendFunc = (alpha) -> {
-                    RenderSystem.blendFunc(GlStateManager.SrcFactor.ZERO, GlStateManager.DstFactor.ONE_MINUS_SRC_COLOR);
+                    RenderSystem.blendFunc(GlStateManager.SourceFactor.ZERO, GlStateManager.DestFactor.ONE_MINUS_SRC_COLOR);
                     RenderSystem.blendEquation(Blender.Equation.ADD.value);
                     RenderSystem.setShaderColor(alpha, alpha, alpha, 1.0F);
                 };
                 case "dodge" -> this.blendFunc = (alpha) -> {
-                    RenderSystem.blendFunc(GlStateManager.SrcFactor.DST_COLOR, GlStateManager.DstFactor.ONE);
+                    RenderSystem.blendFunc(GlStateManager.SourceFactor.DST_COLOR, GlStateManager.DestFactor.ONE);
                     RenderSystem.blendEquation(Blender.Equation.ADD.value);
                     RenderSystem.setShaderColor(alpha, alpha, alpha, 1.0F);
                 };

@@ -3,17 +3,24 @@ package io.github.amerebagatelle.fabricskyboxes.skyboxes.textured;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import io.github.amerebagatelle.fabricskyboxes.api.skyboxes.Skybox;
+
 import io.github.amerebagatelle.fabricskyboxes.mixin.skybox.WorldRendererAccess;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.AbstractSkybox;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.SkyboxType;
+import io.github.amerebagatelle.fabricskyboxes.skyboxes.textured.TexturedSkybox;
 import io.github.amerebagatelle.fabricskyboxes.util.Utils;
 import io.github.amerebagatelle.fabricskyboxes.util.object.*;
-import net.minecraft.client.render.*;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Util;
-import net.minecraft.util.math.RotationAxis;
+import net.minecraft.Util;
+import net.minecraft.client.Camera;
+
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
 import org.joml.Matrix4f;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,12 +53,16 @@ public class MultiTextureSkybox extends TexturedSkybox {
     }
 
     @Override
-    public SkyboxType<? extends Skybox> getType() {
-        return SkyboxType.MULTI_TEXTURE_SKYBOX;
+    public SkyboxType<? extends AbstractSkybox> getType() {
+        return SkyboxType.MONO_COLOR_SKYBOX.get();
     }
 
     @Override
-    public void renderSkybox(WorldRendererAccess worldRendererAccess, MatrixStack matrices, float tickDelta, Camera camera, boolean thickFog, Runnable runnable) {
+    public void renderSkybox(WorldRendererAccess worldRendererAccess, PoseStack matrices, float tickDelta, Camera camera, boolean thickFog) {
+        Tesselator tessellator = Tesselator.getInstance();
+        BufferBuilder bufferBuilder = tessellator.getBuilder();
+
+        bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
         for (int i = 0; i < 6; ++i) {
             // 0 = bottom
             // 1 = north
@@ -60,50 +71,49 @@ public class MultiTextureSkybox extends TexturedSkybox {
             // 4 = east
             // 5 = west
             UVRange faceUVRange = this.uvRanges.byId(i);
-            matrices.push();
+            matrices.pushPose();
 
             if (i == 1) {
-                matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(90.0F));
+                matrices.mulPose(Vector3f.XP.rotationDegrees(90.0F));
             } else if (i == 2) {
-                matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-90.0F));
-                matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180.0F));
+                matrices.mulPose(Vector3f.XP.rotationDegrees(-90.0F));
+                matrices.mulPose(Vector3f.YP.rotationDegrees(180.0F));
             } else if (i == 3) {
-                matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(180.0F));
+                matrices.mulPose(Vector3f.XP.rotationDegrees(180.0F));
             } else if (i == 4) {
-                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(90.0F));
-                matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-90.0F));
+                matrices.mulPose(Vector3f.ZP.rotationDegrees(90.0F));
+                matrices.mulPose(Vector3f.YP.rotationDegrees(-90.0F));
             } else if (i == 5) {
-                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-90.0F));
-                matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(90.0F));
+                matrices.mulPose(Vector3f.ZP.rotationDegrees(-90.0F));
+                matrices.mulPose(Vector3f.YP.rotationDegrees(90.0F));
             }
 
-            Matrix4f matrix4f = matrices.peek().getPositionMatrix();
+            Matrix4f matrix4f = matrices.last().pose();
 
             // animations
             for (Animation animation : this.animations) {
                 animation.tick();
                 UVRange intersect = Utils.findUVIntersection(faceUVRange, animation.getUvRanges()); // todo: cache this intersections so we don't waste gpu cycles
                 if (intersect != null && animation.getCurrentFrame() != null) {
-                    BufferBuilder bufferBuilder = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
                     UVRange intersectionOnCurrentTexture = Utils.mapUVRanges(faceUVRange, this.quad, intersect);
                     UVRange intersectionOnCurrentFrame = Utils.mapUVRanges(animation.getUvRanges(), animation.getCurrentFrame(), intersect);
 
                     // Render the quad at the calculated position
                     RenderSystem.setShaderTexture(0, animation.getTexture().getTextureId());
 
-                    bufferBuilder.vertex(matrix4f, intersectionOnCurrentTexture.getMinU(), -this.quadSize, intersectionOnCurrentTexture.getMinV()).texture(intersectionOnCurrentFrame.getMinU(), intersectionOnCurrentFrame.getMinV());
-                    bufferBuilder.vertex(matrix4f, intersectionOnCurrentTexture.getMinU(), -this.quadSize, intersectionOnCurrentTexture.getMaxV()).texture(intersectionOnCurrentFrame.getMinU(), intersectionOnCurrentFrame.getMaxV());
-                    bufferBuilder.vertex(matrix4f, intersectionOnCurrentTexture.getMaxU(), -this.quadSize, intersectionOnCurrentTexture.getMaxV()).texture(intersectionOnCurrentFrame.getMaxU(), intersectionOnCurrentFrame.getMaxV());
-                    bufferBuilder.vertex(matrix4f, intersectionOnCurrentTexture.getMaxU(), -this.quadSize, intersectionOnCurrentTexture.getMinV()).texture(intersectionOnCurrentFrame.getMaxU(), intersectionOnCurrentFrame.getMinV());
-                    BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
+                    bufferBuilder.vertex(matrix4f, intersectionOnCurrentTexture.getMinU(), -this.quadSize, intersectionOnCurrentTexture.getMinV()).uv(intersectionOnCurrentFrame.getMinU(), intersectionOnCurrentFrame.getMinV()).endVertex();
+                    bufferBuilder.vertex(matrix4f, intersectionOnCurrentTexture.getMinU(), -this.quadSize, intersectionOnCurrentTexture.getMaxV()).uv(intersectionOnCurrentFrame.getMinU(), intersectionOnCurrentFrame.getMaxV()).endVertex();
+                    bufferBuilder.vertex(matrix4f, intersectionOnCurrentTexture.getMaxU(), -this.quadSize, intersectionOnCurrentTexture.getMaxV()).uv(intersectionOnCurrentFrame.getMaxU(), intersectionOnCurrentFrame.getMaxV()).endVertex();
+                    bufferBuilder.vertex(matrix4f, intersectionOnCurrentTexture.getMaxU(), -this.quadSize, intersectionOnCurrentTexture.getMinV()).uv(intersectionOnCurrentFrame.getMaxU(), intersectionOnCurrentFrame.getMinV()).endVertex();
                 }
             }
 
-            matrices.pop();
+            matrices.popPose();
         }
+        BufferUploader.drawWithShader(bufferBuilder.end());
     }
 
     public List<Animation> getAnimations() {
-        return this.animations;
+        return animations;
     }
 }

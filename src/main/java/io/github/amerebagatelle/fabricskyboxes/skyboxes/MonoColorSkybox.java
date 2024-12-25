@@ -3,13 +3,13 @@ package io.github.amerebagatelle.fabricskyboxes.skyboxes;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import io.github.amerebagatelle.fabricskyboxes.api.skyboxes.Skybox;
+import com.mojang.blaze3d.vertex.*;
 import io.github.amerebagatelle.fabricskyboxes.mixin.skybox.WorldRendererAccess;
 import io.github.amerebagatelle.fabricskyboxes.util.object.*;
-import net.minecraft.client.render.*;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.RotationAxis;
+import net.minecraft.client.renderer.*;
+import net.minecraft.client.Camera;
 import org.joml.Matrix4f;
+import com.mojang.math.Axis;
 
 public class MonoColorSkybox extends AbstractSkybox {
     public static Codec<MonoColorSkybox> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -32,44 +32,46 @@ public class MonoColorSkybox extends AbstractSkybox {
     }
 
     @Override
-    public SkyboxType<? extends Skybox> getType() {
+    public SkyboxType<? extends AbstractSkybox> getType() {
         return SkyboxType.MONO_COLOR_SKYBOX;
     }
 
     @Override
-    public void render(WorldRendererAccess worldRendererAccess, MatrixStack matrices, Matrix4f projectionMatrix, float tickDelta, Camera camera, boolean thickFog, Runnable fogCallback) {
+    public void render(WorldRendererAccess worldRendererAccess, PoseStack matrices, Matrix4f projectionMatrix, float tickDelta, Camera camera, boolean thickFog, Runnable fogCallback) {
         if (this.alpha > 0) {
             RenderSystem.depthMask(false);
             RenderSystem.enableBlend();
-            RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+            RenderSystem.setShader(GameRenderer::getPositionColorShader);
             this.blend.applyBlendFunc(this.alpha);
-            BufferBuilder bufferBuilder = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+            BufferBuilder bufferBuilder = Tesselator.getInstance().getBuilder();
+            bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
             for (int i = 0; i < 6; ++i) {
-                matrices.push();
+                matrices.pushPose();
                 if (i == 1) {
-                    matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(90.0F));
+                    matrices.mulPose(Axis.XP.rotationDegrees(90.0F));
                 } else if (i == 2) {
-                    matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-90.0F));
-                    matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180.0F));
+                    matrices.mulPose(Axis.XP.rotationDegrees(-90.0F));
+                    matrices.mulPose(Axis.YP.rotationDegrees(180.0F));
                 } else if (i == 3) {
-                    matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(180.0F));
+                    matrices.mulPose(Axis.XP.rotationDegrees(180.0F));
                 } else if (i == 4) {
-                    matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(90.0F));
-                    matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-90.0F));
+                    matrices.mulPose(Axis.ZP.rotationDegrees(90.0F));
+                    matrices.mulPose(Axis.YP.rotationDegrees(-90.0F));
                 } else if (i == 5) {
-                    matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-90.0F));
-                    matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(90.0F));
+                    matrices.mulPose(Axis.ZP.rotationDegrees(-90.0F));
+                    matrices.mulPose(Axis.YP.rotationDegrees(90.0F));
                 }
 
-                Matrix4f matrix4f = matrices.peek().getPositionMatrix();
-                bufferBuilder.vertex(matrix4f, -100.0F, -100.0F, -100.0F).color(this.color.getRed(), this.color.getGreen(), this.color.getBlue(), this.alpha);
-                bufferBuilder.vertex(matrix4f, -100.0F, -100.0F, 100.0F).color(this.color.getRed(), this.color.getGreen(), this.color.getBlue(), this.alpha);
-                bufferBuilder.vertex(matrix4f, 100.0F, -100.0F, 100.0F).color(this.color.getRed(), this.color.getGreen(), this.color.getBlue(), this.alpha);
-                bufferBuilder.vertex(matrix4f, 100.0F, -100.0F, -100.0F).color(this.color.getRed(), this.color.getGreen(), this.color.getBlue(), this.alpha);
-                matrices.pop();
+                Matrix4f matrix4f = matrices.last().pose();
+                bufferBuilder.vertex(matrix4f, -100.0F, -100.0F, -100.0F).color(this.color.getRed(), this.color.getGreen(), this.color.getBlue(), this.alpha).endVertex();
+                bufferBuilder.vertex(matrix4f, -100.0F, -100.0F, 100.0F).color(this.color.getRed(), this.color.getGreen(), this.color.getBlue(), this.alpha).endVertex();
+                bufferBuilder.vertex(matrix4f, 100.0F, -100.0F, 100.0F).color(this.color.getRed(), this.color.getGreen(), this.color.getBlue(), this.alpha).endVertex();
+                bufferBuilder.vertex(matrix4f, 100.0F, -100.0F, -100.0F).color(this.color.getRed(), this.color.getGreen(), this.color.getBlue(), this.alpha).endVertex();
+                matrices.popPose();
             }
-            BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
+
+            BufferUploader.drawWithShader(bufferBuilder.end());
 
             this.renderDecorations(worldRendererAccess, matrices, projectionMatrix, tickDelta, this.alpha, fogCallback);
 

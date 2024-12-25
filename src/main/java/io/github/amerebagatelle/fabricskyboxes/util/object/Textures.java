@@ -3,7 +3,7 @@ package io.github.amerebagatelle.fabricskyboxes.util.object;
 import com.google.common.collect.Lists;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
 
@@ -39,7 +39,7 @@ public class Textures {
         this.textureList.add(west);
     }
 
-    public Textures(Identifier north, Identifier south, Identifier east, Identifier west, Identifier top, Identifier bottom) {
+    public Textures(ResourceLocation north, ResourceLocation south, ResourceLocation east, ResourceLocation west, ResourceLocation top, ResourceLocation bottom) {
         this(new Texture(north), new Texture(south), new Texture(east), new Texture(west), new Texture(top), new Texture(bottom));
     }
 

@@ -3,7 +3,7 @@ package io.github.amerebagatelle.fabricskyboxes.util.object;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.github.amerebagatelle.fabricskyboxes.util.Utils;
-import net.minecraft.util.Util;
+import net.minecraft.Util;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -70,11 +70,11 @@ public class Animation {
     }
 
     public void tick() {
-        if (this.nextTime <= Util.getEpochTimeMs()) {
+        if (this.nextTime <= Util.getEpochMillis()) {
             // Current Frame
             this.index = (this.index + 1) % (this.gridRows * this.gridColumns);
             this.currentFrame = this.calculateNextFrameUVRange(this.index);
-            this.nextTime = Util.getEpochTimeMs() + this.frameDuration.getOrDefault(String.valueOf(this.index + 1), this.duration);
+            this.nextTime = Util.getEpochMillis() + this.frameDuration.getOrDefault(String.valueOf(this.index + 1), this.duration);
         }
     }
 

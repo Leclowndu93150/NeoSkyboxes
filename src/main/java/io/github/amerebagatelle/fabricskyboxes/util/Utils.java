@@ -9,8 +9,8 @@ import io.github.amerebagatelle.fabricskyboxes.util.object.FogRGBA;
 import io.github.amerebagatelle.fabricskyboxes.util.object.MinMaxEntry;
 import io.github.amerebagatelle.fabricskyboxes.util.object.RGBA;
 import io.github.amerebagatelle.fabricskyboxes.util.object.UVRange;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.util.Mth;
 
 import java.util.Comparator;
 import java.util.List;
@@ -101,15 +101,15 @@ public class Utils {
      * @param world            Client world
      * @return Rotation in degrees
      */
-    public static double calculateRotation(double rotationSpeed, int timeShift, boolean isSkyboxRotation, ClientWorld world) {
+    public static double calculateRotation(double rotationSpeed, int timeShift, boolean isSkyboxRotation, ClientLevel world) {
         if (rotationSpeed != 0F) {
-            long timeOfDay = world.getTimeOfDay() + timeShift;
+            long timeOfDay = world.getDayTime() + timeShift;
             double rotationFraction = timeOfDay / (24000.0D / rotationSpeed);
-            double skyAngle = MathHelper.floorMod(rotationFraction, 1);
+            double skyAngle = Mth.positiveModulo(rotationFraction, 1);
             if (isSkyboxRotation) {
                 return 360D * skyAngle;
             } else {
-                return 360D * world.getDimension().getSkyAngle((long) (24000 * skyAngle));
+                return 360D * world.dimensionType().timeOfDay(((long) (24000 * skyAngle)));
             }
         } else {
             return 0D;
@@ -276,7 +276,7 @@ public class Utils {
         } else {
             float alphaChange = (maxAlpha - minAlpha) / duration;
             float result = in ? lastAlpha + alphaChange : lastAlpha - alphaChange;
-            return MathHelper.clamp(result, minAlpha, maxAlpha);
+            return Mth.clamp(result, minAlpha, maxAlpha);
         }
     }
 
@@ -284,20 +284,20 @@ public class Utils {
         if (min > max) {
             throw new UnsupportedOperationException("Maximum value was lesser than than the minimum value");
         }
-        return Codec.INT.xmap(f -> MathHelper.clamp(f, min, max), Function.identity());
+        return Codec.INT.xmap(f -> Mth.clamp(f, min, max), Function.identity());
     }
 
     public static Codec<Float> getClampedFloat(float min, float max) {
         if (min > max) {
             throw new UnsupportedOperationException("Maximum value was lesser than than the minimum value");
         }
-        return Codec.FLOAT.xmap(f -> MathHelper.clamp(f, min, max), Function.identity());
+        return Codec.FLOAT.xmap(f -> Mth.clamp(f, min, max), Function.identity());
     }
 
     public static Codec<Double> getClampedDouble(double min, double max) {
         if (min > max) {
             throw new UnsupportedOperationException("Maximum value was lesser than than the minimum value");
         }
-        return Codec.DOUBLE.xmap(f -> MathHelper.clamp(f, min, max), Function.identity());
+        return Codec.DOUBLE.xmap(f -> Mth.clamp(f, min, max), Function.identity());
     }
 }

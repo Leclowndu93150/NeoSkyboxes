@@ -2,36 +2,37 @@ package io.github.amerebagatelle.fabricskyboxes.mixin.skybox;
 
 import io.github.amerebagatelle.fabricskyboxes.FabricSkyBoxesClient;
 import io.github.amerebagatelle.fabricskyboxes.SkyboxManager;
-import net.minecraft.block.enums.CameraSubmersionType;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.world.level.material.FogType;
+
+import com.mojang.blaze3d.vertex.PoseStack;
+
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(value = WorldRenderer.class, priority = 900)
+@Mixin(LevelRenderer.class)
 public abstract class SkyboxRenderMixin {
 
-    @Shadow
-    protected abstract boolean hasBlindnessOrDarkness(Camera camera);
+    @Invoker("doesMobEffectBlockSky")
+    protected abstract boolean doesMobEffectBlockSky(Camera camera);
 
     /**
      * Contains the logic for when skyboxes should be rendered.
      */
-    @Inject(method = "renderSky(Lorg/joml/Matrix4f;Lorg/joml/Matrix4f;FLnet/minecraft/client/render/Camera;ZLjava/lang/Runnable;)V", at = @At("HEAD"), cancellable = true)
-    private void renderCustomSkyboxes(Matrix4f matrix4f, Matrix4f projectionMatrix, float tickDelta, Camera camera, boolean thickFog, Runnable fogCallback, CallbackInfo ci) {
+    @Inject(method = "renderSky", at = @At("HEAD"), cancellable = true)
+    private void renderCustomSkyboxes(Matrix4f frustumMatrix, Matrix4f projectionMatrix, float partialTick, Camera camera, boolean isFoggy, Runnable skyFogSetup, CallbackInfo ci) {
         SkyboxManager skyboxManager = SkyboxManager.getInstance();
         if (skyboxManager.isEnabled() && !skyboxManager.getActiveSkyboxes().isEmpty()) {
-            CameraSubmersionType cameraSubmersionType = camera.getSubmersionType();
-            boolean renderSky = !FabricSkyBoxesClient.config().generalSettings.keepVanillaBehaviour || (!thickFog && cameraSubmersionType != CameraSubmersionType.POWDER_SNOW && cameraSubmersionType != CameraSubmersionType.LAVA && cameraSubmersionType != CameraSubmersionType.WATER && !this.hasBlindnessOrDarkness(camera));
+            skyFogSetup.run();
+            FogType fogType = camera.getFluidInCamera();
+            boolean renderSky = !FabricSkyBoxesClient.config().generalSettings.keepVanillaBehaviour || (!bl && fogType != FogType.POWDER_SNOW && fogType != FogType.LAVA && fogType != FogType.WATER && !this.doesMobEffectBlockSky(camera));
             if (renderSky) {
-                MatrixStack matrixStack = new MatrixStack();
-                matrixStack.multiplyPositionMatrix(matrix4f);
-                skyboxManager.renderSkyboxes((WorldRendererAccess) this, matrixStack, projectionMatrix, tickDelta, camera, thickFog, fogCallback);
+                skyboxManager.renderSkyboxes((WorldRendererAccess) this, frustumMatrix, projectionMatrix, partialTick, camera, isFoggy);
             }
             ci.cancel();
         }

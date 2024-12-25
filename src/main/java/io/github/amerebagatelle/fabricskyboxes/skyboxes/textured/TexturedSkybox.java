@@ -6,14 +6,18 @@ import io.github.amerebagatelle.fabricskyboxes.mixin.skybox.WorldRendererAccess;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.AbstractSkybox;
 import io.github.amerebagatelle.fabricskyboxes.util.Utils;
 import io.github.amerebagatelle.fabricskyboxes.util.object.*;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.RotationAxis;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.Camera;
+
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
+
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.GameRenderer;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+
 
 import java.util.Objects;
 
@@ -34,36 +38,38 @@ public abstract class TexturedSkybox extends AbstractSkybox implements Rotatable
      * Overrides and makes final here as there are options that should always be respected in a textured skybox.
      *
      * @param worldRendererAccess Access to the worldRenderer as skyboxes often require it.
-     * @param matrix4f            The current MatrixStack.
+     * @param matrices            The current PoseStack.
      * @param tickDelta           The current tick delta.
      */
     @Override
-    public final void render(WorldRendererAccess worldRendererAccess, MatrixStack matrixStack, Matrix4f projectionMatrix, float tickDelta, Camera camera, boolean thickFog, Runnable fogCallback) {
+    public final void render(WorldRendererAccess worldRendererAccess, PoseStack matrices, Matrix4f matrix4f, float tickDelta, Camera camera, boolean thickFog) {
         RenderSystem.depthMask(false);
         RenderSystem.enableBlend();
 
-        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
         this.blend.applyBlendFunc(this.alpha);
 
-        ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
+        ClientLevel world = Objects.requireNonNull(Minecraft.getInstance().level);
 
         Vector3f rotationStatic = this.rotation.getStatic();
 
-        matrixStack.push();
+        matrices.pushPose();
 
         // axis + time rotation
-        double timeRotationX = Utils.calculateRotation(this.rotation.getRotationSpeedX(), this.rotation.getTimeShift().x(), this.rotation.getSkyboxRotation(), world);
-        double timeRotationY = Utils.calculateRotation(this.rotation.getRotationSpeedY(), this.rotation.getTimeShift().y(), this.rotation.getSkyboxRotation(), world);
-        double timeRotationZ = Utils.calculateRotation(this.rotation.getRotationSpeedZ(), this.rotation.getTimeShift().z(), this.rotation.getSkyboxRotation(), world);
-        this.applyTimeRotation(matrixStack, (float) timeRotationX, (float) timeRotationY, (float) timeRotationZ);
+        double timeRotationX = Utils.calculateRotation(this.rotation.getRotationSpeedX(), this.rotation.getTimeShift().getX(), this.rotation.getSkyboxRotation(), world);
+        double timeRotationY = Utils.calculateRotation(this.rotation.getRotationSpeedY(), this.rotation.getTimeShift().getY(), this.rotation.getSkyboxRotation(), world);
+        double timeRotationZ = Utils.calculateRotation(this.rotation.getRotationSpeedZ(), this.rotation.getTimeShift().getZ(), this.rotation.getSkyboxRotation(), world);
+        this.applyTimeRotation(matrices, (float) timeRotationX, (float) timeRotationY, (float) timeRotationZ);
         // static
-        matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(rotationStatic.x()));
-        matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(rotationStatic.y()));
-        matrixStack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rotationStatic.z()));
-        this.renderSkybox(worldRendererAccess, matrixStack, tickDelta, camera, thickFog, fogCallback);
-        matrixStack.pop();
+        matrices.mulPose(Vector3f.XP.rotationDegrees(rotationStatic.x()));
+        matrices.mulPose(Vector3f.YP.rotationDegrees(rotationStatic.y()));
+        matrices.mulPose(Vector3f.ZP.rotationDegrees(rotationStatic.z()));
+        this.renderSkybox(worldRendererAccess, matrices, tickDelta, camera, thickFog);
+        matrices.popPose();
 
-        this.renderDecorations(worldRendererAccess, matrixStack, projectionMatrix, tickDelta, this.alpha, fogCallback);
+        BufferBuilder bufferBuilder = Tesselator.getInstance().getBuilder();
+
+        this.renderDecorations(worldRendererAccess, matrices, matrix4f, tickDelta, bufferBuilder, this.alpha);
 
         RenderSystem.depthMask(true);
         RenderSystem.disableBlend();
@@ -74,20 +80,20 @@ public abstract class TexturedSkybox extends AbstractSkybox implements Rotatable
     /**
      * Override this method instead of render if you are extending this skybox.
      */
-    public abstract void renderSkybox(WorldRendererAccess worldRendererAccess, MatrixStack matrixStack, float tickDelta, Camera camera, boolean thickFog, Runnable runnable);
+    public abstract void renderSkybox(WorldRendererAccess worldRendererAccess, PoseStack matrices, float tickDelta, Camera camera, boolean thickFog);
 
-    private void applyTimeRotation(MatrixStack matrixStack, float timeRotationX, float timeRotationY, float timeRotationZ) {
+    private void applyTimeRotation(PoseStack matrices, float timeRotationX, float timeRotationY, float timeRotationZ) {
         // Very ugly, find a better way to do this
         Vector3f timeRotationAxis = this.rotation.getAxis();
-        matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(timeRotationAxis.x()));
-        matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(timeRotationAxis.y()));
-        matrixStack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(timeRotationAxis.z()));
-        matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(timeRotationX));
-        matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(timeRotationY));
-        matrixStack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(timeRotationZ));
-        matrixStack.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(timeRotationAxis.z()));
-        matrixStack.multiply(RotationAxis.NEGATIVE_Y.rotationDegrees(timeRotationAxis.y()));
-        matrixStack.multiply(RotationAxis.NEGATIVE_X.rotationDegrees(timeRotationAxis.x()));
+        matrices.mulPose(Vector3f.XP.rotationDegrees(timeRotationAxis.x()));
+        matrices.mulPose(Vector3f.YP.rotationDegrees(timeRotationAxis.y()));
+        matrices.mulPose(Vector3f.ZP.rotationDegrees(timeRotationAxis.z()));
+        matrices.mulPose(Vector3f.XP.rotationDegrees(timeRotationX));
+        matrices.mulPose(Vector3f.YP.rotationDegrees(timeRotationY));
+        matrices.mulPose(Vector3f.ZP.rotationDegrees(timeRotationZ));
+        matrices.mulPose(Vector3f.ZN.rotationDegrees(timeRotationAxis.z()));
+        matrices.mulPose(Vector3f.YN.rotationDegrees(timeRotationAxis.y()));
+        matrices.mulPose(Vector3f.XN.rotationDegrees(timeRotationAxis.x()));
     }
 
     public Blend getBlend() {

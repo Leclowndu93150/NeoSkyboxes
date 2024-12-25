@@ -1,5 +1,6 @@
 package io.github.amerebagatelle.fabricskyboxes.skyboxes.textured;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.github.amerebagatelle.fabricskyboxes.api.skyboxes.Skybox;
@@ -7,8 +8,8 @@ import io.github.amerebagatelle.fabricskyboxes.mixin.skybox.WorldRendererAccess;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.AbstractSkybox;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.SkyboxType;
 import io.github.amerebagatelle.fabricskyboxes.util.object.*;
-import net.minecraft.client.render.Camera;
-import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.Camera;
+import org.joml.Matrix4f;
 
 import java.util.List;
 
@@ -44,7 +45,7 @@ public class AnimatedSquareTexturedSkybox extends SquareTexturedSkybox {
     }
 
     @Override
-    public void renderSkybox(WorldRendererAccess worldRendererAccess, MatrixStack matrices, float tickDelta, Camera camera, boolean thickFog, Runnable runnable) {
+    public void renderSkybox(WorldRendererAccess worldRendererAccess, PoseStack matrices, float tickDelta, Camera camera, boolean thickFog, Runnable runnable) {
         if (this.lastTime == 0L) this.lastTime = System.currentTimeMillis();
         this.textures = this.getAnimationTextures().get(this.count);
 

@@ -5,39 +5,35 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import io.github.amerebagatelle.fabricskyboxes.FabricSkyBoxesClient;
 import io.github.amerebagatelle.fabricskyboxes.SkyboxManager;
-import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
-import net.minecraft.resource.Resource;
-import net.minecraft.resource.ResourceManager;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 
 import java.io.InputStreamReader;
 import java.util.Map;
 
-public class SkyboxResourceListener implements SimpleSynchronousResourceReloadListener {
+public class SkyboxResourceListener implements ResourceManagerReloadListener {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().serializeNulls().setLenient().create();
 
     @Override
-    public void reload(ResourceManager manager) {
+    public void onResourceManagerReload(ResourceManager manager) {
         SkyboxManager skyboxManager = SkyboxManager.getInstance();
 
         // clear registered skyboxes on reload
         skyboxManager.clearSkyboxes();
 
         // load new skyboxes
-        Map<Identifier, Resource> resources = manager.findResources("sky", identifier -> identifier.getPath().endsWith(".json"));
+        Map<ResourceLocation, Resource> resources = manager.listResources("sky", ResourceLocation -> ResourceLocation.getPath().endsWith(".json"));
 
-        resources.forEach((identifier, resource) -> {
+        resources.forEach((ResourceLocation, resource) -> {
             try {
-                JsonObject json = GSON.fromJson(new InputStreamReader(resource.getInputStream()), JsonObject.class);
-                skyboxManager.addSkybox(identifier, json);
+                JsonObject json = GSON.fromJson(new InputStreamReader(resource.open()), JsonObject.class);
+                skyboxManager.addSkybox(ResourceLocation, json);
             } catch (Exception e) {
-                FabricSkyBoxesClient.getLogger().error("Error reading skybox {}", identifier.toString(), e);
+                FabricSkyBoxesClient.getLogger().error("Error reading skybox " + ResourceLocation.toString());
+                e.printStackTrace();
             }
         });
-    }
-
-    @Override
-    public Identifier getFabricId() {
-        return Identifier.of("fabricskyboxes", "skybox_json");
     }
 }

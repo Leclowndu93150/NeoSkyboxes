@@ -121,7 +121,7 @@ public class Blender {
     }
 
     public boolean isValidFactor(int factor) {
-        return Arrays.stream(GlStateManager.SrcFactor.values()).filter(factor1 -> factor == factor1.value).count() == 1;
+        return Arrays.stream(GlStateManager.SourceFactor.values()).filter(factor1 -> factor == factor1.value).count() == 1;
     }
 
     public boolean isValidEquation(int equation) {

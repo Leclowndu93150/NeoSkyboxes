@@ -4,7 +4,7 @@ import com.google.gson.JsonObject;
 import io.github.amerebagatelle.fabricskyboxes.SkyboxManager;
 import io.github.amerebagatelle.fabricskyboxes.api.skyboxes.Skybox;
 import io.github.amerebagatelle.fabricskyboxes.util.JsonObjectWrapper;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
 
@@ -46,17 +46,17 @@ public interface FabricSkyBoxesApi {
      * @param identifier Identifier for skybox.
      * @param skybox     Skybox implementation.
      */
-    void addSkybox(Identifier identifier, Skybox skybox);
+    void addSkybox(ResourceLocation identifier, Skybox skybox);
 
     /**
      * Allows mods to add new skyboxes with a {@link JsonObject} at runtime.
-     * This method applies {@link SkyboxManager#parseSkyboxJson(Identifier, JsonObjectWrapper)}
-     * serialization and adds the skybox with {@link #addSkybox(Identifier, Skybox)}
+     * This method applies {@link SkyboxManager#parseSkyboxJson(ResourceLocation, JsonObjectWrapper)}
+     * serialization and adds the skybox with {@link #addSkybox(ResourceLocation, Skybox)}
      *
      * @param identifier Identifier for skybox.
      * @param jsonObject Json Object.
      */
-    void addSkybox(Identifier identifier, JsonObject jsonObject);
+    void addSkybox(ResourceLocation identifier, JsonObject jsonObject);
 
     /**
      * Allows mods to add new permanent skyboxes at runtime.
@@ -64,7 +64,7 @@ public interface FabricSkyBoxesApi {
      * @param identifier Identifier for skybox.
      * @param skybox     Skybox implementation.
      */
-    void addPermanentSkybox(Identifier identifier, Skybox skybox);
+    void addPermanentSkybox(ResourceLocation identifier, Skybox skybox);
 
     /**
      * Clears all non-permanent skyboxes.

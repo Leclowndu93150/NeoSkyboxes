@@ -2,14 +2,15 @@ package io.github.amerebagatelle.fabricskyboxes.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.mojang.blaze3d.platform.InputConstants;
 import io.github.amerebagatelle.fabricskyboxes.FabricSkyBoxesClient;
 import io.github.amerebagatelle.fabricskyboxes.SkyboxManager;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.text.Text;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.Component;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.File;
@@ -45,10 +46,6 @@ public class FabricSkyBoxesConfig {
         return config;
     }
 
-    public KeyBindingImpl getKeyBinding() {
-        return this.keyBinding;
-    }
-
     public void save() {
         File dir = this.file.getParentFile();
 
@@ -76,35 +73,39 @@ public class FabricSkyBoxesConfig {
         public boolean debugHud = false;
     }
 
+    public static class KeyBindingImpl {
 
-    public static class KeyBindingImpl implements ClientTickEvents.EndTick {
-
-        public final KeyBinding toggleFabricSkyBoxes;
-        public final KeyBinding toggleSkyboxDebugHud;
+        public final KeyMapping toggleFabricSkyBoxes;
+        public final KeyMapping toggleSkyboxDebugHud;
 
         public KeyBindingImpl() {
-            this.toggleFabricSkyBoxes = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.fabricskyboxes.toggle", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "category.fabricskyboxes"));
-            this.toggleSkyboxDebugHud = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.fabricskyboxes.toggle.debug_hud", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "category.fabricskyboxes"));
+            this.toggleFabricSkyBoxes = new KeyMapping("key.forgeskyboxes.toggle", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "category.forgeskyboxes");
+            this.toggleSkyboxDebugHud = new KeyMapping("key.forgeskyboxes.toggle.debug_hud", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_F12, "category.forgeskyboxes");
         }
 
-        @Override
-        public void onEndTick(MinecraftClient client) {
-            while (this.toggleFabricSkyBoxes.wasPressed()) {
+        @SubscribeEvent
+        public void onEndTick(ClientTickEvent.Post event) {
+            while (this.toggleFabricSkyBoxes.consumeClick()) {
                 FabricSkyBoxesClient.config().generalSettings.enable = !FabricSkyBoxesClient.config().generalSettings.enable;
                 FabricSkyBoxesClient.config().save();
                 SkyboxManager.getInstance().setEnabled(FabricSkyBoxesClient.config().generalSettings.enable);
 
-                assert client.player != null;
+                LocalPlayer player = Minecraft.getInstance().player;
+                assert player != null;
                 if (SkyboxManager.getInstance().isEnabled()) {
-                    client.player.sendMessage(Text.translatable("fabricskyboxes.message.enabled"), false);
+                    player.sendSystemMessage(Component.translatable("forgeskyboxes.message.enabled"));
                 } else {
-                    client.player.sendMessage(Text.translatable("fabricskyboxes.message.disabled"), false);
+                    player.sendSystemMessage(Component.translatable("forgeskyboxes.message.disabled"));
                 }
             }
-            while (this.toggleSkyboxDebugHud.wasPressed()) {
+            while (this.toggleSkyboxDebugHud.consumeClick()) {
                 FabricSkyBoxesClient.config().generalSettings.debugHud = !FabricSkyBoxesClient.config().generalSettings.debugHud;
                 FabricSkyBoxesClient.config().save();
             }
         }
+    }
+
+    public KeyBindingImpl getKeyBinding() {
+        return this.keyBinding;
     }
 }

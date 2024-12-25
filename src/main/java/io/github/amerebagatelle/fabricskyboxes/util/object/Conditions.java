@@ -4,17 +4,17 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.Collection;
 import java.util.List;
 
 public class Conditions {
     public static final Codec<Conditions> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Identifier.CODEC.listOf().optionalFieldOf("biomes", ImmutableList.of()).forGetter(Conditions::getBiomes),
-            Identifier.CODEC.listOf().optionalFieldOf("worlds", ImmutableList.of()).forGetter(Conditions::getWorlds),
-            Identifier.CODEC.listOf().optionalFieldOf("dimensions", ImmutableList.of()).forGetter(Conditions::getDimensions),
-            Identifier.CODEC.listOf().optionalFieldOf("effects", ImmutableList.of()).forGetter(Conditions::getEffects),
+            ResourceLocation.CODEC.listOf().optionalFieldOf("biomes", ImmutableList.of()).forGetter(Conditions::getBiomes),
+            ResourceLocation.CODEC.listOf().optionalFieldOf("worlds", ImmutableList.of()).forGetter(Conditions::getWorlds),
+            ResourceLocation.CODEC.listOf().optionalFieldOf("dimensions", ImmutableList.of()).forGetter(Conditions::getDimensions),
+            ResourceLocation.CODEC.listOf().optionalFieldOf("effects", ImmutableList.of()).forGetter(Conditions::getEffects),
             Weather.CODEC.listOf().optionalFieldOf("weather", ImmutableList.of()).forGetter(Conditions::getWeathers),
             MinMaxEntry.CODEC.listOf().optionalFieldOf("xRanges", ImmutableList.of()).forGetter(Conditions::getXRanges),
             MinMaxEntry.CODEC.listOf().optionalFieldOf("yRanges", ImmutableList.of()).forGetter(Conditions::getYRanges),
@@ -22,17 +22,17 @@ public class Conditions {
             Loop.CODEC.optionalFieldOf("loop", Loop.DEFAULT).forGetter(Conditions::getLoop)
     ).apply(instance, Conditions::new));
     public static final Conditions DEFAULT = new Builder().build();
-    private final List<Identifier> biomes;
-    private final List<Identifier> worlds;
-    private final List<Identifier> dimensions;
-    private final List<Identifier> effects;
+    private final List<ResourceLocation> biomes;
+    private final List<ResourceLocation> worlds;
+    private final List<ResourceLocation> dimensions;
+    private final List<ResourceLocation> effects;
     private final List<Weather> weathers;
     private final List<MinMaxEntry> yRanges;
     private final List<MinMaxEntry> zRanges;
     private final List<MinMaxEntry> xRanges;
     private final Loop loop;
 
-    public Conditions(List<Identifier> biomes, List<Identifier> worlds, List<Identifier> dimensions, List<Identifier> effects, List<Weather> weathers, List<MinMaxEntry> xRanges, List<MinMaxEntry> yRanges, List<MinMaxEntry> zRanges, Loop loop) {
+    public Conditions(List<ResourceLocation> biomes, List<ResourceLocation> worlds, List<ResourceLocation> dimensions, List<ResourceLocation> effects, List<Weather> weathers, List<MinMaxEntry> xRanges, List<MinMaxEntry> yRanges, List<MinMaxEntry> zRanges, Loop loop) {
         this.biomes = biomes;
         this.worlds = worlds;
         this.dimensions = dimensions;
@@ -44,19 +44,19 @@ public class Conditions {
         this.loop = loop;
     }
 
-    public List<Identifier> getBiomes() {
+    public List<ResourceLocation> getBiomes() {
         return this.biomes;
     }
 
-    public List<Identifier> getWorlds() {
+    public List<ResourceLocation> getWorlds() {
         return this.worlds;
     }
 
-    public List<Identifier> getDimensions() {
+    public List<ResourceLocation> getDimensions() {
         return this.dimensions;
     }
 
-    public List<Identifier> getEffects() {
+    public List<ResourceLocation> getEffects() {
         return this.effects;
     }
 
@@ -81,32 +81,32 @@ public class Conditions {
     }
 
     public static class Builder {
-        private final List<Identifier> biomes = Lists.newArrayList();
-        private final List<Identifier> worlds = Lists.newArrayList();
-        private final List<Identifier> dimensions = Lists.newArrayList();
-        private final List<Identifier> effects = Lists.newArrayList();
+        private final List<ResourceLocation> biomes = Lists.newArrayList();
+        private final List<ResourceLocation> worlds = Lists.newArrayList();
+        private final List<ResourceLocation> dimensions = Lists.newArrayList();
+        private final List<ResourceLocation> effects = Lists.newArrayList();
         private final List<Weather> weathers = Lists.newArrayList();
         private final List<MinMaxEntry> yRanges = Lists.newArrayList();
         private final List<MinMaxEntry> zRanges = Lists.newArrayList();
         private final List<MinMaxEntry> xRanges = Lists.newArrayList();
         private Loop loop = Loop.DEFAULT;
 
-        public Builder biomes(Collection<Identifier> biomeIds) {
+        public Builder biomes(Collection<ResourceLocation> biomeIds) {
             this.biomes.addAll(biomeIds);
             return this;
         }
 
-        public Builder worlds(Collection<Identifier> worldIds) {
+        public Builder worlds(Collection<ResourceLocation> worldIds) {
             this.worlds.addAll(worldIds);
             return this;
         }
 
-        public Builder dimensions(Collection<Identifier> dimensionIds) {
+        public Builder dimensions(Collection<ResourceLocation> dimensionIds) {
             this.dimensions.addAll(dimensionIds);
             return this;
         }
 
-        public Builder effects(Collection<Identifier> effectIds) {
+        public Builder effects(Collection<ResourceLocation> effectIds) {
             this.effects.addAll(effectIds);
             return this;
         }
@@ -131,11 +131,11 @@ public class Conditions {
             return this;
         }
 
-        public Builder biomes(Identifier... biomeIds) {
+        public Builder biomes(ResourceLocation... biomeIds) {
             return this.biomes(Lists.newArrayList(biomeIds));
         }
 
-        public Builder worlds(Identifier... worldIds) {
+        public Builder worlds(ResourceLocation... worldIds) {
             return this.worlds(Lists.newArrayList(worldIds));
         }
 

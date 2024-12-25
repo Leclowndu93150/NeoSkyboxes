@@ -1,30 +1,30 @@
 package io.github.amerebagatelle.fabricskyboxes;
 
 import io.github.amerebagatelle.fabricskyboxes.config.FabricSkyBoxesConfig;
-import io.github.amerebagatelle.fabricskyboxes.config.SkyBoxDebugScreen;
 import io.github.amerebagatelle.fabricskyboxes.resource.SkyboxResourceListener;
+import io.github.amerebagatelle.fabricskyboxes.skyboxes.LegacyDeserializer;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.SkyboxType;
-import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.resource.ResourceType;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.server.packs.resources.ReloadableResourceManager;
+
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-@Environment(EnvType.CLIENT)
-public class FabricSkyBoxesClient implements ClientModInitializer {
-    public static final String MODID = "fabricskyboxes";
+@Mod(FabricSkyBoxesClient.MODID)
+public class FabricSkyBoxesClient {
+    public static final String MODID = "forgeskyboxes";
     private static Logger LOGGER;
     private static FabricSkyBoxesConfig CONFIG;
 
     public static Logger getLogger() {
         if (LOGGER == null) {
-            LOGGER = LogManager.getLogger("FabricSkyboxes");
+            LOGGER = LogManager.getLogger("ForgeSkyboxes");
         }
         return LOGGER;
     }
@@ -38,25 +38,38 @@ public class FabricSkyBoxesClient implements ClientModInitializer {
     }
 
     private static FabricSkyBoxesConfig loadConfig() {
-        return FabricSkyBoxesConfig.load(FabricLoader.getInstance().getConfigDir().resolve("fabricskyboxes-config.json").toFile());
+        return FabricSkyBoxesConfig.load(FMLPaths.CONFIGDIR.get().resolve("neoforgeskyboxes-config.json").toFile());
     }
 
-    @Override
-    public void onInitializeClient() {
-        SkyboxType.initRegistry();
-        ResourceManagerHelper.get(ResourceType.CLIENT_RESOURCES).registerReloadListener(new SkyboxResourceListener());
-        SkyboxManager.getInstance().setEnabled(config().generalSettings.enable);
-        ClientTickEvents.END_WORLD_TICK.register(SkyboxManager.getInstance());
-        ClientTickEvents.END_CLIENT_TICK.register(config().getKeyBinding());
+    public FabricSkyBoxesClient(IEventBus bus) {
 
-        //
-        //KeyBinding keyBinding = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.fabricskyboxes.toggle.debug_screen", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "category.fabricskyboxes"));
-        SkyBoxDebugScreen screen = new SkyBoxDebugScreen(Text.of("Skybox Debug Screen"));
-        /*ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (keyBinding.wasPressed()) {
-                client.setScreen(screen);
-            }
-        });*/
-        HudRenderCallback.EVENT.register(screen);
+        SkyboxType.SKYBOX_TYPES.register(bus);
+        LegacyDeserializer.DESERIALIZER.register(bus);
+
+        bus.addListener(this::onInitializeClient);
+        bus.addListener(this::registerBindings);
+
+        NeoForge.EVENT_BUS.register(this);
+    }
+
+    public void onInitializeClient(FMLClientSetupEvent event) {
+        IEventBus bus = NeoForge.EVENT_BUS;
+        SkyboxType.SKYBOX_TYPES.register(bus);
+        SkyboxManager.getInstance().setEnabled(config().generalSettings.enable);
+
+        ReloadableResourceManager resourceManager = (ReloadableResourceManager) Minecraft.getInstance().getResourceManager();
+        resourceManager.registerReloadListener(new SkyboxResourceListener());
+
+        NeoForge.EVENT_BUS.register(SkyboxManager.getInstance());
+        NeoForge.EVENT_BUS.register(config().getKeyBinding());
+
+        Minecraft.getInstance().reloadResourcePacks();
+    }
+
+    public void registerBindings(RegisterKeyMappingsEvent event) {
+        FabricSkyBoxesConfig.KeyBindingImpl keyMappings = config().getKeyBinding();
+
+        event.register(keyMappings.toggleFabricSkyBoxes);
+        event.register(keyMappings.toggleSkyboxDebugHud);
     }
 }

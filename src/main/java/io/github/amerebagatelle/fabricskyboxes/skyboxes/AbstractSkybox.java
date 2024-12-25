@@ -2,29 +2,38 @@ package io.github.amerebagatelle.fabricskyboxes.skyboxes;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import io.github.amerebagatelle.fabricskyboxes.FabricSkyBoxesClient;
+
 import io.github.amerebagatelle.fabricskyboxes.api.skyboxes.FSBSkybox;
-import io.github.amerebagatelle.fabricskyboxes.api.skyboxes.Skybox;
 import io.github.amerebagatelle.fabricskyboxes.mixin.skybox.WorldRendererAccess;
 import io.github.amerebagatelle.fabricskyboxes.util.Utils;
 import io.github.amerebagatelle.fabricskyboxes.util.object.Conditions;
 import io.github.amerebagatelle.fabricskyboxes.util.object.Decorations;
 import io.github.amerebagatelle.fabricskyboxes.util.object.Properties;
 import io.github.amerebagatelle.fabricskyboxes.util.object.Weather;
-import net.minecraft.block.enums.CameraSubmersionType;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.VertexBuffer;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.render.*;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.RotationAxis;
-import net.minecraft.world.biome.Biome;
+import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.FogRenderer;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.core.Registry;
+
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexBuffer;
+import com.mojang.blaze3d.vertex.VertexFormat;
+
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.util.Mth;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.material.FogType;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+
 
 import java.util.Objects;
 
@@ -58,7 +67,7 @@ public abstract class AbstractSkybox implements FSBSkybox {
     }
 
     @Override
-    public void tick(ClientWorld clientWorld) {
+    public void tick(ClientLevel ClientLevel) {
         this.updateAlpha();
     }
 
@@ -69,7 +78,7 @@ public abstract class AbstractSkybox implements FSBSkybox {
      */
     @Override
     public final float updateAlpha() {
-        int currentTime = (int) (Objects.requireNonNull(MinecraftClient.getInstance().world).getTimeOfDay() % 24000);
+        int currentTime = (int) (Objects.requireNonNull(Minecraft.getInstance().level).getDayTime() % 24000);
 
         boolean condition = this.checkConditions();
 
@@ -88,7 +97,7 @@ public abstract class AbstractSkybox implements FSBSkybox {
 
         this.alpha = (fadeAlpha * this.conditionAlpha) * (this.properties.getMaxAlpha() - this.properties.getMinAlpha()) + this.properties.getMinAlpha();
 
-        this.alpha = MathHelper.clamp(this.alpha, this.properties.getMinAlpha(), this.properties.getMaxAlpha());
+        this.alpha = Mth.clamp(this.alpha, this.properties.getMinAlpha(), this.properties.getMaxAlpha());
         this.lastTime = currentTime;
 
         return this.alpha;
@@ -107,56 +116,56 @@ public abstract class AbstractSkybox implements FSBSkybox {
      * @return Whether the current biomes and dimensions are valid for this skybox.
      */
     protected boolean checkBiomes() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        Objects.requireNonNull(client.world);
+        Minecraft client = Minecraft.getInstance();
+        Objects.requireNonNull(client.level);
         Objects.requireNonNull(client.player);
-        return this.conditions.getBiomes().isEmpty() || this.conditions.getBiomes().contains(client.world.getRegistryManager().get(RegistryKeys.BIOME).getId(client.world.getBiome(client.player.getBlockPos()).value()));
+        return this.conditions.getBiomes().isEmpty() || this.conditions.getBiomes().contains(client.level.registryAccess().registryOrThrow(Registries.BIOME).getKey(client.level.getBiome(client.player.blockPosition()).value()));
     }
 
     /**
-     * @return Whether the current dimension identifier is valid for this skybox
+     * @return Whether the current dimension ResourceLocation is valid for this skybox
      */
     protected boolean checkDimensions() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        Objects.requireNonNull(client.world);
-        return this.conditions.getDimensions().isEmpty() || this.conditions.getDimensions().contains(client.world.getRegistryKey().getValue());
+        Minecraft client = Minecraft.getInstance();
+        Objects.requireNonNull(client.level);
+        return this.conditions.getDimensions().isEmpty() || this.conditions.getDimensions().contains(client.level.dimension().location());
     }
 
     /**
      * @return Whether the current dimension sky effect is valid for this skybox
      */
     protected boolean checkWorlds() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        Objects.requireNonNull(client.world);
-        return this.conditions.getWorlds().isEmpty() || this.conditions.getWorlds().contains(client.world.getDimension().effects());
+        Minecraft client = Minecraft.getInstance();
+        Objects.requireNonNull(client.level);
+        return this.conditions.getWorlds().isEmpty() || this.conditions.getWorlds().contains(client.level.dimensionType().effectsLocation());
     }
 
     /*
 		Check if an effect that should prevent skybox from showing
      */
     protected boolean checkEffects() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        Objects.requireNonNull(client.world);
+        Minecraft client = Minecraft.getInstance();
+        Objects.requireNonNull(client.level);
 
-        Camera camera = client.gameRenderer.getCamera();
+        Camera camera = client.gameRenderer.getMainCamera();
 
         if (this.conditions.getEffects().isEmpty()) {
             // Vanilla checks
-            boolean thickFog = client.world.getDimensionEffects().useThickFog(MathHelper.floor(camera.getPos().getX()), MathHelper.floor(camera.getPos().getY())) || client.inGameHud.getBossBarHud().shouldThickenFog();
+            boolean thickFog = client.level.effects().isFoggyAt(Mth.floor(camera.getBlockPosition().getX()), Mth.floor(camera.getBlockPosition().getY())) || client.gui.getBossOverlay().shouldCreateWorldFog();
             if (thickFog) {
                 // Render skybox in thick fog, enabled by default
                 return this.properties.isRenderInThickFog();
             }
 
-            CameraSubmersionType cameraSubmersionType = camera.getSubmersionType();
-            if (cameraSubmersionType == CameraSubmersionType.POWDER_SNOW || cameraSubmersionType == CameraSubmersionType.LAVA)
+            FogType fogType = camera.getFluidInCamera();
+            if (fogType == FogType.POWDER_SNOW || fogType == FogType.LAVA)
                 return false;
 
-            return !(camera.getFocusedEntity() instanceof LivingEntity livingEntity) || (!livingEntity.hasStatusEffect(StatusEffects.BLINDNESS) && !livingEntity.hasStatusEffect(StatusEffects.DARKNESS));
+            return !(camera.getEntity() instanceof LivingEntity livingEntity) || (!livingEntity.hasEffect(MobEffects.BLINDNESS) && !livingEntity.hasEffect(MobEffects.DARKNESS));
 
         } else {
-            if (camera.getFocusedEntity() instanceof LivingEntity livingEntity) {
-                return this.conditions.getEffects().stream().noneMatch(identifier -> client.world.getRegistryManager().get(RegistryKeys.STATUS_EFFECT).get(identifier) != null && livingEntity.hasStatusEffect(client.world.getRegistryManager().get(RegistryKeys.STATUS_EFFECT).getEntry(client.world.getRegistryManager().get(RegistryKeys.STATUS_EFFECT).get(identifier))));
+            if (camera.getEntity() instanceof LivingEntity livingEntity) {
+                return this.conditions.getEffects().stream().noneMatch(ResourceLocation -> client.level.registryAccess().registryOrThrow(Registries.MOB_EFFECT).get(ResourceLocation) != null && livingEntity.hasEffect(client.level.registryAccess().registryOrThrow(Registry.MOB_EFFECT_REGISTRY).get(ResourceLocation)));
             }
         }
         return true;
@@ -166,7 +175,7 @@ public abstract class AbstractSkybox implements FSBSkybox {
      * @return Whether the current x values are valid for this skybox.
      */
     protected boolean checkXRanges() {
-        double playerX = Objects.requireNonNull(MinecraftClient.getInstance().player).getX();
+        double playerX = Objects.requireNonNull(Minecraft.getInstance().player).getX();
         return Utils.checkRanges(playerX, this.conditions.getXRanges());
     }
 
@@ -174,7 +183,7 @@ public abstract class AbstractSkybox implements FSBSkybox {
      * @return Whether the current y values are valid for this skybox.
      */
     protected boolean checkYRanges() {
-        double playerY = Objects.requireNonNull(MinecraftClient.getInstance().player).getY();
+        double playerY = Objects.requireNonNull(Minecraft.getInstance().player).getY();
         return Utils.checkRanges(playerY, this.conditions.getYRanges());
     }
 
@@ -182,7 +191,7 @@ public abstract class AbstractSkybox implements FSBSkybox {
      * @return Whether the current z values are valid for this skybox.
      */
     protected boolean checkZRanges() {
-        double playerZ = Objects.requireNonNull(MinecraftClient.getInstance().player).getZ();
+        double playerZ = Objects.requireNonNull(Minecraft.getInstance().player).getZ();
         return Utils.checkRanges(playerZ, this.conditions.getZRanges());
     }
 
@@ -191,7 +200,7 @@ public abstract class AbstractSkybox implements FSBSkybox {
      */
     protected boolean checkLoop() {
         if (!this.conditions.getLoop().getRanges().isEmpty() && this.conditions.getLoop().getDays() > 0) {
-            double currentTime = Objects.requireNonNull(MinecraftClient.getInstance().world).getTimeOfDay() - this.properties.getFade().getStartFadeIn();
+            double currentTime = Objects.requireNonNull(Minecraft.getInstance().level).getDayTime() - this.properties.getFade().getStartFadeIn();
             while (currentTime < 0) {
                 currentTime += 24000 * this.conditions.getLoop().getDays();
             }
@@ -207,113 +216,112 @@ public abstract class AbstractSkybox implements FSBSkybox {
      * @return Whether the current weather is valid for this skybox.
      */
     protected boolean checkWeather() {
-        ClientWorld world = Objects.requireNonNull(MinecraftClient.getInstance().world);
-        ClientPlayerEntity player = Objects.requireNonNull(MinecraftClient.getInstance().player);
-        Biome.Precipitation precipitation = world.getBiome(player.getBlockPos()).value().getPrecipitation(player.getBlockPos());
-        if (!this.conditions.getWeathers().isEmpty()) {
-            if (this.conditions.getWeathers().contains(Weather.THUNDER) && world.isThundering()) {
+        ClientLevel level = Objects.requireNonNull(Minecraft.getInstance().level);
+        LocalPlayer player = Objects.requireNonNull(Minecraft.getInstance().player);
+        Biome.Precipitation precipitation = level.getBiome(player.blockPosition()).value().getPrecipitationAt(player.blockPosition());
+        if (this.conditions.getWeathers().size() > 0) {
+            if (this.conditions.getWeathers().contains(Weather.THUNDER) && level.isThundering()) {
                 return true;
             }
-            if (this.conditions.getWeathers().contains(Weather.RAIN) && world.isRaining() && !world.isThundering()) {
+            if (this.conditions.getWeathers().contains(Weather.RAIN) && level.isRaining()) {
                 return true;
             }
-            if (this.conditions.getWeathers().contains(Weather.SNOW) && world.isRaining() && precipitation == Biome.Precipitation.SNOW) {
+            if (this.conditions.getWeathers().contains(Weather.SNOW) && level.isRaining() && precipitation == Biome.Precipitation.SNOW) {
                 return true;
             }
-            if (this.conditions.getWeathers().contains(Weather.BIOME_RAIN) && world.isRaining() && precipitation == Biome.Precipitation.RAIN) {
+            if (this.conditions.getWeathers().contains(Weather.BIOME_RAIN) && level.isRaining() && precipitation == Biome.Precipitation.RAIN) {
                 return true;
             }
-            return this.conditions.getWeathers().contains(Weather.CLEAR) && !world.isRaining() && !world.isThundering();
+            return this.conditions.getWeathers().contains(Weather.CLEAR) && !level.isRaining() && !level.isThundering();
         } else {
             return true;
         }
     }
 
-    public abstract SkyboxType<? extends Skybox> getType();
+    public abstract SkyboxType<? extends AbstractSkybox> getType();
 
-    public void renderDecorations(WorldRendererAccess worldRendererAccess, MatrixStack matrixStack, Matrix4f projectionMatrix, float tickDelta, float alpha, Runnable fogCallback) {
+    public void renderDecorations(WorldRendererAccess levelRendererAccess, PoseStack matrices, PoseStack matrix4f, float tickDelta, BufferBuilder bufferBuilder, float alpha) {
         RenderSystem.enableBlend();
         Vector3f rotationStatic = this.decorations.getRotation().getStatic();
         Vector3f rotationAxis = this.decorations.getRotation().getAxis();
-        ClientWorld world = MinecraftClient.getInstance().world;
-        assert world != null;
+        ClientLevel level = Minecraft.getInstance().level;
+        assert level != null;
 
         // Custom Blender
         this.decorations.getBlend().applyBlendFunc(alpha);
-        matrixStack.push();
+        matrices.pushPose();
 
         // axis rotation
-        matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(rotationAxis.x()));
-        matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(rotationAxis.y()));
-        matrixStack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rotationAxis.z()));
+        matrices.mulPose(Vector3f.XP.rotationDegrees(rotationAxis.x()));
+        matrices.mulPose(Vector3f.YP.rotationDegrees(rotationAxis.y()));
+        matrices.mulPose(Vector3f.ZP.rotationDegrees(rotationAxis.z()));
 
         // Vanilla rotation
-        //matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-90.0F));
+        //matrices.mulPose(Vector3f.YP.rotationDegrees(-90.0F));
         // Iris Compat
-        //matrixStack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(IrisCompat.getSunPathRotation()));
-        //matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(world.getSkyAngle(tickDelta) * 360.0F * this.decorations.getRotation().getRotationSpeed()));
+        //matrices.mulPose(Vector3f.ZP.rotationDegrees(IrisCompat.getSunPathRotation()));
+        //matrices.mulPose(Vector3f.XP.rotationDegrees(level.getSkyAngle(tickDelta) * 360.0F * this.decorations.getRotation().getRotationSpeed()));
 
         // Custom rotation
-        double timeRotationX = Utils.calculateRotation(this.decorations.getRotation().getRotationSpeedX(), this.decorations.getRotation().getTimeShift().x(), this.decorations.getRotation().getSkyboxRotation(), world);
-        double timeRotationY = Utils.calculateRotation(this.decorations.getRotation().getRotationSpeedY(), this.decorations.getRotation().getTimeShift().y(), this.decorations.getRotation().getSkyboxRotation(), world);
-        double timeRotationZ = Utils.calculateRotation(this.decorations.getRotation().getRotationSpeedZ(), this.decorations.getRotation().getTimeShift().z(), this.decorations.getRotation().getSkyboxRotation(), world);
-        matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees((float) timeRotationX));
-        matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees((float) timeRotationY));
-        matrixStack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees((float) timeRotationZ));
+        double timeRotationX = Utils.calculateRotation(this.decorations.getRotation().getRotationSpeedX(), this.decorations.getRotation().getTimeShift().getX(), this.decorations.getRotation().getSkyboxRotation(), level);
+        double timeRotationY = Utils.calculateRotation(this.decorations.getRotation().getRotationSpeedY(), this.decorations.getRotation().getTimeShift().getY(), this.decorations.getRotation().getSkyboxRotation(), level);
+        double timeRotationZ = Utils.calculateRotation(this.decorations.getRotation().getRotationSpeedZ(), this.decorations.getRotation().getTimeShift().getZ(), this.decorations.getRotation().getSkyboxRotation(), level);
+        matrices.mulPose(Vector3f.XP.rotationDegrees((float) timeRotationX));
+        matrices.mulPose(Vector3f.YP.rotationDegrees((float) timeRotationY));
+        matrices.mulPose(Vector3f.ZP.rotationDegrees((float) timeRotationZ));
 
         // axis rotation
-        matrixStack.multiply(RotationAxis.NEGATIVE_Z.rotationDegrees(rotationAxis.z()));
-        matrixStack.multiply(RotationAxis.NEGATIVE_Y.rotationDegrees(rotationAxis.y()));
-        matrixStack.multiply(RotationAxis.NEGATIVE_X.rotationDegrees(rotationAxis.x()));
+        matrices.mulPose(Vector3f.ZN.rotationDegrees(rotationAxis.z()));
+        matrices.mulPose(Vector3f.YN.rotationDegrees(rotationAxis.y()));
+        matrices.mulPose(Vector3f.XN.rotationDegrees(rotationAxis.x()));
 
         // static rotation
-        matrixStack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(rotationStatic.x()));
-        matrixStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(rotationStatic.y()));
-        matrixStack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rotationStatic.z()));
+        matrices.mulPose(Vector3f.XP.rotationDegrees(rotationStatic.x()));
+        matrices.mulPose(Vector3f.YP.rotationDegrees(rotationStatic.y()));
+        matrices.mulPose(Vector3f.ZP.rotationDegrees(rotationStatic.z()));
 
-        Matrix4f matrix4f2 = matrixStack.peek().getPositionMatrix();
-        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
+        Matrix4f matrix4f2 = matrices.last().pose();
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
         // Sun
         if (this.decorations.isSunEnabled()) {
             RenderSystem.setShaderTexture(0, this.decorations.getSunTexture());
-            BufferBuilder bufferBuilder = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
-            bufferBuilder.vertex(matrix4f2, -30.0F, 100.0F, -30.0F).texture(0.0F, 0.0F);
-            bufferBuilder.vertex(matrix4f2, 30.0F, 100.0F, -30.0F).texture(1.0F, 0.0F);
-            bufferBuilder.vertex(matrix4f2, 30.0F, 100.0F, 30.0F).texture(1.0F, 1.0F);
-            bufferBuilder.vertex(matrix4f2, -30.0F, 100.0F, 30.0F).texture(0.0F, 1.0F);
-            BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
+            bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+            bufferBuilder.vertex(matrix4f2, -30.0F, 100.0F, -30.0F).uv(0.0F, 0.0F).endVertex();
+            bufferBuilder.vertex(matrix4f2, 30.0F, 100.0F, -30.0F).uv(1.0F, 0.0F).endVertex();
+            bufferBuilder.vertex(matrix4f2, 30.0F, 100.0F, 30.0F).uv(1.0F, 1.0F).endVertex();
+            bufferBuilder.vertex(matrix4f2, -30.0F, 100.0F, 30.0F).uv(0.0F, 1.0F).endVertex();
+            BufferUploader.drawWithShader(bufferBuilder.end());
         }
         // Moon
         if (this.decorations.isMoonEnabled()) {
             RenderSystem.setShaderTexture(0, this.decorations.getMoonTexture());
-            int moonPhase = world.getMoonPhase();
+            int moonPhase = level.getMoonPhase();
             int xCoord = moonPhase % 4;
             int yCoord = moonPhase / 4 % 2;
             float startX = xCoord / 4.0F;
             float startY = yCoord / 2.0F;
             float endX = (xCoord + 1) / 4.0F;
             float endY = (yCoord + 1) / 2.0F;
-            BufferBuilder bufferBuilder = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
-            bufferBuilder.vertex(matrix4f2, -20.0F, -100.0F, 20.0F).texture(endX, endY);
-            bufferBuilder.vertex(matrix4f2, 20.0F, -100.0F, 20.0F).texture(startX, endY);
-            bufferBuilder.vertex(matrix4f2, 20.0F, -100.0F, -20.0F).texture(startX, startY);
-            bufferBuilder.vertex(matrix4f2, -20.0F, -100.0F, -20.0F).texture(endX, startY);
-            BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
+            bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+            bufferBuilder.vertex(matrix4f2, -20.0F, -100.0F, 20.0F).uv(endX, endY).endVertex();
+            bufferBuilder.vertex(matrix4f2, 20.0F, -100.0F, 20.0F).uv(startX, endY).endVertex();
+            bufferBuilder.vertex(matrix4f2, 20.0F, -100.0F, -20.0F).uv(startX, startY).endVertex();
+            bufferBuilder.vertex(matrix4f2, -20.0F, -100.0F, -20.0F).uv(endX, startY).endVertex();
+            BufferUploader.drawWithShader(bufferBuilder.end());
         }
         // Stars
         if (this.decorations.isStarsEnabled()) {
-            float i = 1.0F - world.getRainGradient(tickDelta);
-            float brightness = world.getStarBrightness(tickDelta) * i;
+            float i = 1.0F - level.getRainLevel(tickDelta);
+            float brightness = level.getStarBrightness(tickDelta) * i;
             if (brightness > 0.0F) {
                 RenderSystem.setShaderColor(brightness, brightness, brightness, brightness);
-                BackgroundRenderer.clearFog();
-                worldRendererAccess.getStarsBuffer().bind();
-                worldRendererAccess.getStarsBuffer().draw(matrixStack.peek().getPositionMatrix(), projectionMatrix, GameRenderer.getPositionProgram());
+                FogRenderer.setupNoFog();
+                levelRendererAccess.getStarsBuffer().bind();
+                levelRendererAccess.getStarsBuffer().drawWithShader(matrices.last().pose(), matrix4f, GameRenderer.getPositionShader());
                 VertexBuffer.unbind();
-                fogCallback.run();
             }
         }
-        matrixStack.pop();
+        matrices.popPose();
 
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.disableBlend();

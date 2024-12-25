@@ -1,17 +1,22 @@
 package io.github.amerebagatelle.fabricskyboxes.skyboxes.textured;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import io.github.amerebagatelle.fabricskyboxes.api.skyboxes.Skybox;
+
 import io.github.amerebagatelle.fabricskyboxes.mixin.skybox.WorldRendererAccess;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.AbstractSkybox;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.SkyboxType;
 import io.github.amerebagatelle.fabricskyboxes.util.object.*;
-import net.minecraft.client.render.*;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.RotationAxis;
+import net.minecraft.client.Camera;
 import org.joml.Matrix4f;
+
 
 public class SingleSpriteSquareTexturedSkybox extends TexturedSkybox {
     public static Codec<SingleSpriteSquareTexturedSkybox> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -21,8 +26,9 @@ public class SingleSpriteSquareTexturedSkybox extends TexturedSkybox {
             Blend.CODEC.optionalFieldOf("blend", Blend.DEFAULT).forGetter(TexturedSkybox::getBlend),
             Texture.CODEC.fieldOf("texture").forGetter(SingleSpriteSquareTexturedSkybox::getTexture)
     ).apply(instance, SingleSpriteSquareTexturedSkybox::new));
-    private final UVRanges uvRanges;
     protected Texture texture;
+
+    private final UVRanges uvRanges;
 
     public SingleSpriteSquareTexturedSkybox(Properties properties, Conditions conditions, Decorations decorations, Blend blend, Texture texture) {
         super(properties, conditions, decorations, blend);
@@ -38,8 +44,8 @@ public class SingleSpriteSquareTexturedSkybox extends TexturedSkybox {
     }
 
     @Override
-    public SkyboxType<? extends Skybox> getType() {
-        return SkyboxType.SINGLE_SPRITE_SQUARE_TEXTURED_SKYBOX;
+    public SkyboxType<? extends AbstractSkybox> getType() {
+        return SkyboxType.SINGLE_SPRITE_SQUARE_TEXTURED_SKYBOX.get();
     }
 
     public Texture getTexture() {
@@ -47,8 +53,10 @@ public class SingleSpriteSquareTexturedSkybox extends TexturedSkybox {
     }
 
     @Override
-    public void renderSkybox(WorldRendererAccess worldRendererAccess, MatrixStack matrices, float tickDelta, Camera camera, boolean thickFog, Runnable runnable) {
-        BufferBuilder bufferBuilder = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+    public void renderSkybox(WorldRendererAccess worldRendererAccess, PoseStack matrices, float tickDelta, Camera camera, boolean thickFog) {
+        Tesselator tessellator = Tesselator.getInstance();
+        BufferBuilder bufferBuilder = tessellator.getBuilder();
+        bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
         RenderSystem.setShaderTexture(0, texture.getTextureId());
         for (int i = 0; i < 6; ++i) {
             // 0 = bottom
@@ -58,30 +66,30 @@ public class SingleSpriteSquareTexturedSkybox extends TexturedSkybox {
             // 4 = east
             // 5 = west
             UVRange tex = this.uvRanges.byId(i);
-            matrices.push();
+            matrices.pushPose();
 
             if (i == 1) {
-                matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(90.0F));
+                matrices.mulPose(Vector3f.XP.rotationDegrees(90.0F));
             } else if (i == 2) {
-                matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-90.0F));
-                matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180.0F));
+                matrices.mulPose(Vector3f.XP.rotationDegrees(-90.0F));
+                matrices.mulPose(Vector3f.YP.rotationDegrees(180.0F));
             } else if (i == 3) {
-                matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(180.0F));
+                matrices.mulPose(Vector3f.XP.rotationDegrees(180.0F));
             } else if (i == 4) {
-                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(90.0F));
-                matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-90.0F));
+                matrices.mulPose(Vector3f.ZP.rotationDegrees(90.0F));
+                matrices.mulPose(Vector3f.YP.rotationDegrees(-90.0F));
             } else if (i == 5) {
-                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-90.0F));
-                matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(90.0F));
+                matrices.mulPose(Vector3f.ZP.rotationDegrees(-90.0F));
+                matrices.mulPose(Vector3f.YP.rotationDegrees(90.0F));
             }
 
-            Matrix4f matrix4f = matrices.peek().getPositionMatrix();
-            bufferBuilder.vertex(matrix4f, -100.0F, -100.0F, -100.0F).texture(tex.getMinU(), tex.getMinV());
-            bufferBuilder.vertex(matrix4f, -100.0F, -100.0F, 100.0F).texture(tex.getMinU(), tex.getMaxV());
-            bufferBuilder.vertex(matrix4f, 100.0F, -100.0F, 100.0F).texture(tex.getMaxU(), tex.getMaxV());
-            bufferBuilder.vertex(matrix4f, 100.0F, -100.0F, -100.0F).texture(tex.getMaxU(), tex.getMinV());
-            matrices.pop();
+            Matrix4f matrix4f = matrices.last().pose();
+            bufferBuilder.vertex(matrix4f, -100.0F, -100.0F, -100.0F).uv(tex.getMinU(), tex.getMinV()).endVertex();
+            bufferBuilder.vertex(matrix4f, -100.0F, -100.0F, 100.0F).uv(tex.getMinU(), tex.getMaxV()).endVertex();
+            bufferBuilder.vertex(matrix4f, 100.0F, -100.0F, 100.0F).uv(tex.getMaxU(), tex.getMaxV()).endVertex();
+            bufferBuilder.vertex(matrix4f, 100.0F, -100.0F, -100.0F).uv(tex.getMaxU(), tex.getMinV()).endVertex();
+            matrices.popPose();
         }
-        BufferRenderer.drawWithGlobalProgram(bufferBuilder.end());
+        BufferUploader.drawWithShader(bufferBuilder.end());
     }
 }

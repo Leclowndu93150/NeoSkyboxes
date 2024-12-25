@@ -3,7 +3,7 @@ package io.github.amerebagatelle.fabricskyboxes.util.object.internal;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import io.github.amerebagatelle.fabricskyboxes.skyboxes.SkyboxType;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 public class Metadata {
     public static final Codec<Metadata> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -12,9 +12,9 @@ public class Metadata {
     ).apply(instance, Metadata::new));
 
     private final int schemaVersion;
-    private final Identifier type;
+    private final ResourceLocation type;
 
-    public Metadata(int schemaVersion, Identifier type) {
+    public Metadata(int schemaVersion, ResourceLocation type) {
         this.schemaVersion = schemaVersion;
         this.type = type;
     }
@@ -23,7 +23,7 @@ public class Metadata {
         return this.schemaVersion;
     }
 
-    public Identifier getType() {
+    public ResourceLocation getType() {
         return this.type;
     }
 }
